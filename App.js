@@ -10,7 +10,8 @@ import app from './src/utils/firebase'; // Firebase configurado
 
 import Auth from './src/components/Auth'; // Componente Auth
 
-import ListBirthday from './src/screens/ListBirthday'; // Pantalla para usuarios autenticados
+import ListBirthday from './src/screens/ListBirthday';
+import AppNavigator from "./src/navigation/AppNavigator"; // Pantalla para usuarios autenticados
 
 export default function App() {
 
@@ -46,7 +47,7 @@ export default function App() {
     <View style={styles.container}>
       <StatusBar style="auto" />
 
-      {user ? <ListBirthday /> : <Auth />}
+      {user ? <AppNavigator /> : <Auth />}
     </View>
 
   );

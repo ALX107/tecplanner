@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native'
 import React, { useState } from 'react'
-import ActionBar from './ActionBar'
-import AddBirthday from './AddBirthday'
+import ActionBar from '../components/ActionBar'
+import AddBirthday from '../components/AddBirthday'
 
 export default function ListBirthday() {
     const [showList, setshowList] = useState(true)
