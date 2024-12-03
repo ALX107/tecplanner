@@ -12,10 +12,7 @@ const RegisterSubjectForm = ({ onAddSubject }) => {
         codigo: '',
         docente: '',
         semestre: '1er semestre',
-        tareas: {
-            descripcion: '',
-            fecha_entrega: Timestamp.fromDate(new Date()),
-        },
+        userId: '55'
     });
 
     // Validar si el código es único
@@ -63,10 +60,7 @@ const RegisterSubjectForm = ({ onAddSubject }) => {
                 codigo: '',
                 docente: '',
                 semestre: '1er semestre',
-                tareas: {
-                    descripcion: '',
-                    fecha_entrega: Timestamp.fromDate(new Date()),
-                },
+                userId: '55'
             });
         } catch (error) {
             console.error('Error al agregar la materia: ', error);
