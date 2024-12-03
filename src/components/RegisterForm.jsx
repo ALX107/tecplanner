@@ -4,6 +4,7 @@ import { useState } from 'react'
 import app from '../utils/firebase'
 import { validateEmail } from '../utils/validation'
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
+import { getFirestore, doc, setDoc } from "firebase/firestore";
 
 export default function RegisterForm({ changeForm }) {
 
@@ -14,44 +15,46 @@ export default function RegisterForm({ changeForm }) {
     }) //declarar una variable donde le aisgno un objeto con 3 atributos
 
     const [formErrors, setFormErrors] = useState({})
+    const auth = getAuth(app);
+    const db = getFirestore(app);
 
-    const register = () => {
-        let errors = {}
-        if (!formData.email || !formData.password || !formData.confirmPassword) { //si no hay nada en los campos
-            //console.log('Un campo esta vacio')
-            if (!formData.email) errors.email = true
-            if (!formData.password) errors.password = true
-            if (!formData.confirmPassword) errors.confirmPassword = true
-        } else if (!validateEmail(formData.email)) { //que el correo esté escrito correctamente
-            errors.email = true
-        } else if (formData.password !== formData.confirmPassword) { //que las dos pass coincidan
-            errors.password = true
-            errors.confirmPassword = true
-        } else if (formData.password.length < 6) { //que la pass tenga más de 6 caracteres
-            errors.password = true
-            errors.confirmPassword = true
+    const register = async () => {
+        let errors = {};
+        if (!formData.email || !formData.password || !formData.confirmPassword) {
+          if (!formData.email) errors.email = true;
+          if (!formData.password) errors.password = true;
+          if (!formData.confirmPassword) errors.confirmPassword = true;
+        } else if (!validateEmail(formData.email)) {
+          errors.email = true;
+        } else if (formData.password !== formData.confirmPassword) {
+          errors.password = true;
+          errors.confirmPassword = true;
+        } else if (formData.password.length < 6) {
+          errors.password = true;
+          errors.confirmPassword = true;
+        } else {
+          try {
+            const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+            const user = userCredential.user;
+    
+            // Crear el documento del usuario en Firestore
+            await setDoc(doc(db, 'users', user.uid), {
+              name: 'Nuevo Usuario',
+              email: user.email,
+              createdAt: new Date().toISOString(),
+              isDarkMode: false,
+              tasksCompleted: 0,
+              averageGrade: null,
+            });
+    
+            console.log('Usuario registrado y guardado en Firestore');
+          } catch (error) {
+            console.error('Error al registrar el usuario:', error);
+          }
         }
-        else { //si no hay errores
-            console.log(formData)
-
-            const auth = getAuth(app);//traigo a app
-            createUserWithEmailAndPassword(auth, formData.email, formData.password)
-                .then((userCredential) => {
-                    // Signed up 
-                    const user = userCredential.user;
-                    console.log(user)
-                    // ...
-                })
-                .catch((error) => {
-                    const errorCode = error.code;
-                    const errorMessage = error.message;
-                    console.log(error.message)
-                    // ..
-                });
-        }
-        setFormErrors(errors) //se asignen errores a form errors
-        // console.log(errors)
-    }
+    
+        setFormErrors(errors);
+      };
 
     return (
         <>
@@ -82,7 +85,7 @@ export default function RegisterForm({ changeForm }) {
                 </TouchableOpacity>
 
                 <TouchableOpacity >
-                    <Text style={styles.btnText} onPress={changeForm} > INCIAR SESIÓN </Text>
+                    <Text style={styles.btnText} onPress={changeForm} > INICIAR SESIÓN </Text>
                 </TouchableOpacity>
             </View>
         </>
@@ -91,44 +94,62 @@ export default function RegisterForm({ changeForm }) {
 
 const styles = StyleSheet.create({
     title: {
-        fontSize: 20,
-        marginBottom: 20,
-        marginTop: 5,
+        fontSize: 32,
+        marginBottom: 25,
+        marginTop: 15,
         textAlign: 'center',
         fontWeight: 'bold',
-        color: '#1E3040'
+        color: '#1E3040',
+        textShadowColor: 'rgba(0, 0, 0, 0.3)', // Sombra del texto
+        textShadowOffset: { width: 2, height: 2 },
+        textShadowRadius: 3,
     },
     input: {
-        borderWidth: 1,
+        borderWidth: 1.5,
         borderColor: 'black',
-        padding: 10,
-        marginBottom: 10, //separar los inputs
+        backgroundColor: '#f8f9fa', // Fondo claro en los inputs
+        padding: 15,
+        marginBottom: 15, // Espaciado más grande
         borderRadius: 30,
         fontSize: 18,
-        width: '80%',
-        height: 50,
+        width: '85%',
+        height: 55,
         paddingHorizontal: 20,
-        alignSelf: 'center'
+        alignSelf: 'center',
+        shadowColor: '#000', // Sombra para mayor profundidad
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+        elevation: 2,
     },
     error: {
-        borderColor: 'red',
-        borderWidth: 4,
+        borderColor: '#ff4d4d', // Rojo más vibrante
+        borderWidth: 2,
+        backgroundColor: '#ffe6e6', // Fondo tenue para resaltar errores
     },
     register: {
         flex: 1,
         justifyContent: 'flex-end',
-        marginBottom: 10,
+        marginBottom: 20,
+        alignItems: 'center', // Centra los botones
     },
     btnText: {
         color: 'white',
         fontWeight: 'bold',
-        fontSize: 18,
+        fontSize: 20, // Tamaño más grande
         textAlign: 'center',
-        padding: 10,
+        padding: 12,
         backgroundColor: '#1E3040',
-        borderRadius: 30,
-        marginTop: 10,
-        width: '80%',
-        alignSelf: 'center'
-    }
-})
+        borderRadius: 50, // Botones redondeados
+        marginTop: 15,
+        width: '85%',
+        alignSelf: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 5 },
+        shadowOpacity: 0.3,
+        shadowRadius: 6,
+        elevation: 5,
+        textTransform: 'uppercase', // Todo en mayúsculas
+        letterSpacing: 2, // Espaciado entre letras
+    },
+});

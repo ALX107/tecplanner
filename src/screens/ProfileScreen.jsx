@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useContext } from "react";
 import { View, Text, TextInput, Button, StyleSheet, Alert, Switch } from "react-native";
 import { getAuth, updatePassword, deleteUser } from "firebase/auth";
-import { getFirestore, doc, getDoc, deleteDoc } from "firebase/firestore";
+import { getFirestore, doc, getDoc, updateDoc } from "firebase/firestore";
 import { ThemeContext } from '../context/ThemeContext';
 
 const ProfileScreen = ({ navigation }) => {
   const [newPassword, setNewPassword] = useState("");
   const [message, setMessage] = useState("");
   const [userData, setUserData] = useState(null); // Datos del usuario
+  const [newName, setNewName] = useState(""); // Campo de nombre
   const { isDarkMode, toggleTheme } = useContext(ThemeContext);
   const auth = getAuth();
   const db = getFirestore();
@@ -31,6 +32,28 @@ const ProfileScreen = ({ navigation }) => {
 
     fetchUserData();
   }, []);
+
+  // Actualizar nombre
+  const handleUpdateName = async () => {
+    if (!newName.trim()) {
+      setMessage("El nombre no puede estar vacío.");
+      return;
+    }
+
+    try {
+      const userDoc = doc(db, 'users', auth.currentUser.uid);
+      await updateDoc(userDoc, { name: newName });
+      setUserData({ ...userData, name: newName }); // Actualiza el estado local
+      setMessage("Nombre actualizado correctamente.");
+      setNewName(""); // Limpia el campo
+      Alert.alert("Éxito", "Los cambios fueron exitosos.", [
+        { text: "OK", onPress: () => navigation.goBack() }, // Regresa al Dashboard
+      ]);
+    } catch (error) {
+      console.error("Error al actualizar el nombre:", error);
+      setMessage("Hubo un error al actualizar el nombre.");
+    }
+  };
 
   // Cambiar contraseña
   const handleChangePassword = () => {
@@ -95,6 +118,19 @@ const ProfileScreen = ({ navigation }) => {
       <Text style={styles.info}>Tareas Completadas: {userData.tasksCompleted || 0}</Text>
       <Text style={styles.info}>Promedio General: {userData.averageGrade || "N/A"}</Text>
 
+      {/* Actualizar Nombre */}
+      <Text style={styles.subtitle}>Actualizar Nombre:</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="Nuevo nombre"
+        value={newName}
+        onChangeText={setNewName}
+      />
+      <Button title="Actualizar Nombre" onPress={handleUpdateName} />
+
+      {/* Mensaje de confirmación o error */}
+      {message ? <Text style={styles.message}>{message}</Text> : null}
+
       {/* Cambiar Contraseña */}
       <Text style={styles.subtitle}>Cambiar Contraseña:</Text>
       <TextInput
@@ -105,15 +141,6 @@ const ProfileScreen = ({ navigation }) => {
         onChangeText={setNewPassword}
       />
       <Button title="Actualizar Contraseña" onPress={handleChangePassword} />
-
-      {/* Mensaje de confirmación o error */}
-      {message ? <Text style={styles.message}>{message}</Text> : null}
-
-      {/* Toggle de Modo Oscuro */}
-      <View style={styles.toggleContainer}>
-        <Text style={styles.toggleText}>Modo Oscuro</Text>
-        <Switch value={isDarkMode} onValueChange={toggleTheme} />
-      </View>
 
       {/* Eliminar Cuenta */}
       <Button
@@ -158,23 +185,13 @@ const styles = StyleSheet.create({
   },
   lightContainer: {
     flex: 1,
-    backgroundColor: '#ffffff', // Fondo claro
+    backgroundColor: '#ffffff',
     padding: 20,
   },
   darkContainer: {
     flex: 1,
-    backgroundColor: '#333333', // Fondo oscuro
+    backgroundColor: '#333333',
     padding: 20,
-  },
-  toggleContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  toggleText: {
-    fontSize: 18,
-    color: '#000',
   },
 });
 

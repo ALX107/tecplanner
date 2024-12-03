@@ -18,7 +18,7 @@ export default function Auth() {
 
     return (
         <View style={styles.view}>
-            <Image style={styles.logo} source={require('../../assets/login.png')} />
+            <Image style={styles.logo} source={require('../../assets/TecPlanner.png')} />
 
             {isLogin ? <LoginForm changeForm={changeForm} /> : <RegisterForm changeForm={changeForm} />}
         </View>
@@ -45,7 +45,7 @@ const styles = StyleSheet.create({
 
         marginTop: 50,
 
-        marginBottom: 50,
+        marginBottom: 30,
 
         alignSelf: 'center',
 

@@ -7,6 +7,7 @@ import ProfileScreen from "../screens/ProfileScreen";
 import TasksScreen from "../screens/TasksScreen";
 import GradesScreen from "../screens/GradesScreen";
 import NotesScreen from "../screens/NotesScreen";
+import AuthScreen from "../components/Auth";
 
 const Stack = createStackNavigator();
 
@@ -19,6 +20,7 @@ const AppNavigator = () => {
                 <Stack.Screen name="Tasks" component={TasksScreen} options={{ title: 'Tareas' }}/>
                 <Stack.Screen name="Grades" component={GradesScreen} options={{ title: 'Calificaciones' }}/>
                 <Stack.Screen name="Notes" component={NotesScreen} options={{ title: 'Notas' }}/>
+                <Stack.Screen name="Auth" component={AuthScreen} options={{ title: 'Auth' }}/>
             </Stack.Navigator>
         </NavigationContainer>
     );

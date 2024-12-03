@@ -27,18 +27,27 @@ const EditSubjectForm = ({ visible, onClose, materia, onUpdate }) => {
 
     const validarCodigoUnico = async (codigo) => {
         try {
-            const querySnapshot = await getDocs(collection(db, 'materias'));
-            const materias = querySnapshot.docs.map((doc) => ({
-                id: doc.id,
-                codigo: doc.data().codigo,
-            }));
-
-            return !materias.some((m) => m.codigo === codigo && m.id !== materia.id);
+            const auth = getAuth(app);
+            const userId = auth.currentUser?.uid;
+            if (!userId) {
+                console.error('Usuario no autenticado');
+                return false;
+            }
+    
+            const q = query(
+                collection(db, 'materias'),
+                where('userId', '==', userId), // Filtra por el userId del usuario
+                where('codigo', '==', codigo)
+            );
+    
+            const querySnapshot = await getDocs(q);
+            return querySnapshot.docs.every((doc) => doc.id !== materia.id); // Asegúrate de que no coincida con otro documento
         } catch (error) {
             console.error('Error al validar el código único:', error);
             return false;
         }
     };
+    
 
     const editarMateria = async () => {
         if (
@@ -50,22 +59,24 @@ const EditSubjectForm = ({ visible, onClose, materia, onUpdate }) => {
             Alert.alert('Error', 'Todos los campos son obligatorios.');
             return;
         }
-
+    
         const codigoEsUnico = await validarCodigoUnico(editedData.codigo);
         if (!codigoEsUnico) {
             Alert.alert('Error', 'El código ya existe. Por favor, usa un código único.');
             return;
         }
-
+    
         try {
-            await updateDoc(doc(db, 'materias', materia.id), editedData);
-            onUpdate({ ...materia, ...editedData });
+            const updatedMateria = { ...editedData, userId: materia.userId }; // Mantén el userId
+            await updateDoc(doc(db, 'materias', materia.id), updatedMateria);
+            onUpdate({ ...materia, ...updatedMateria });
             onClose();
         } catch (error) {
             console.error('Error al editar la materia: ', error);
             Alert.alert('Error', 'No se pudo editar la materia.');
         }
     };
+    
 
     const handleCodigoChange = (text) => {
         const numericValue = text.replace(/[^0-9]/g, '');

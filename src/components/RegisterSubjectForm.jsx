@@ -1,75 +1,112 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, Button, StyleSheet, Alert } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
-import { collection, addDoc, getDocs } from 'firebase/firestore';
-import { getFirestore, Timestamp } from 'firebase/firestore';
+import { query, where, getDocs, collection, addDoc, getFirestore} from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
+import app from '../utils/firebase';
 
 const RegisterSubjectForm = ({ onAddSubject }) => {
-    const db = getFirestore(app); // Obtenemos Firestore de la configuración de Firebase
+    const db = getFirestore(app); // Firestore
+    const auth = getAuth(app); // Auth
     const [newMateria, setNewMateria] = useState({
         nombre: '',
         calificaciones: [],
         codigo: '',
         docente: '',
-        semestre: '1er semestre',
-        userId: '55'
+        semestre: '1º semestre',
+        userId: '', // Será dinámico
     });
 
     // Validar si el código es único
     const validarCodigoUnico = async (codigo) => {
         try {
-            const querySnapshot = await getDocs(collection(db, 'materias'));
-            const codigosExistentes = querySnapshot.docs.map((doc) => doc.data().codigo);
-            return !codigosExistentes.includes(codigo); // Devuelve true si el código no existe
+            const userId = auth.currentUser?.uid; // UID del usuario
+            if (!userId) {
+                Alert.alert('Error', 'Usuario no autenticado.');
+                return false;
+            }
+
+            const q = query(
+                collection(db, 'materias'),
+                where('userId', '==', userId),
+                where('codigo', '==', codigo)
+            );
+
+            const querySnapshot = await getDocs(q);
+            return querySnapshot.empty; // Devuelve true si no hay conflictos
         } catch (error) {
             console.error('Error al validar el código único:', error);
             return false;
         }
     };
 
-    const agregarMateria = async () => {
-        if (
-            !newMateria.nombre.trim() ||
-            !newMateria.codigo.trim() ||
-            !newMateria.docente.trim() ||
-            !newMateria.semestre.trim()
-        ) {
-            Alert.alert('Error', 'Todos los campos son obligatorios.');
-            return;
-        }
+    let isAdding = false;
 
-        // Validar si el código es único
-        const codigoEsUnico = await validarCodigoUnico(newMateria.codigo);
-        if (!codigoEsUnico) {
-            Alert.alert('Error', 'El código ya existe. Por favor, usa un código único.');
-            return;
-        }
+const agregarMateria = async () => {
+    if (isAdding) {
+        console.log('Ya se está procesando una inserción. Cancelando.');
+        return;
+    }
 
-        try {
-            // Guardar la materia en Firestore
-            const docRef = await addDoc(collection(db, 'materias'), newMateria);
-            console.log('Materia agregada con ID: ', docRef.id);
+    isAdding = true;
 
-            // Notificar al componente principal (GradesScreen)
-            onAddSubject({ ...newMateria, id: docRef.id });
+    const userId = auth.currentUser?.uid;
 
-            // Reiniciar el estado
-            setNewMateria({
-                nombre: '',
-                calificaciones: [],
-                codigo: '',
-                docente: '',
-                semestre: '1er semestre',
-                userId: '55'
-            });
-        } catch (error) {
-            console.error('Error al agregar la materia: ', error);
-            Alert.alert('Error', 'No se pudo agregar la materia.');
-        }
-    };
+    if (!userId) {
+        Alert.alert('Error', 'Usuario no autenticado.');
+        isAdding = false;
+        return;
+    }
 
+    if (
+        !newMateria.nombre.trim() ||
+        !newMateria.codigo.trim() ||
+        !newMateria.docente.trim() ||
+        !newMateria.semestre.trim()
+    ) {
+        Alert.alert('Error', 'Todos los campos son obligatorios.');
+        isAdding = false;
+        return;
+    }
+
+    const codigoEsUnico = await validarCodigoUnico(newMateria.codigo);
+    if (!codigoEsUnico) {
+        Alert.alert('Error', 'El código ya existe. Por favor, usa un código único.');
+        isAdding = false;
+        return;
+    }
+
+    try {
+        const datosParaFirestore = {
+            nombre: newMateria.nombre.trim(),
+            calificaciones: [],
+            codigo: newMateria.codigo.trim(),
+            docente: newMateria.docente.trim(),
+            semestre: newMateria.semestre.trim(),
+            userId,
+        };
+
+        const docRef = await addDoc(collection(db, 'materias'), datosParaFirestore);
+        console.log('Materia agregada con ID:', docRef.id);
+
+        onAddSubject({ ...datosParaFirestore, id: docRef.id });
+
+        setNewMateria({
+            nombre: '',
+            calificaciones: [],
+            codigo: '',
+            docente: '',
+            semestre: '1º semestre',
+        });
+    } catch (error) {
+        Alert.alert('Error', `No se pudo agregar la materia: ${error.message}`);
+    } finally {
+        isAdding = false;
+    }
+};
+      
+    
     const handleCodigoChange = (text) => {
-        // Permitir solo números
         const numericValue = text.replace(/[^0-9]/g, '');
         setNewMateria({ ...newMateria, codigo: numericValue });
     };
@@ -82,7 +119,7 @@ const RegisterSubjectForm = ({ onAddSubject }) => {
                 style={styles.input}
                 placeholder="Código del curso"
                 value={newMateria.codigo}
-                keyboardType="numeric" // Muestra el teclado numérico
+                keyboardType="numeric"
                 onChangeText={handleCodigoChange}
             />
 
@@ -106,21 +143,12 @@ const RegisterSubjectForm = ({ onAddSubject }) => {
                 onValueChange={(itemValue) => setNewMateria({ ...newMateria, semestre: itemValue })}
                 style={styles.picker}
             >
-                {[
-                    '1er semestre',
-                    '2do semestre',
-                    '3er semestre',
-                    '4to semestre',
-                    '5to semestre',
-                    '6to semestre',
-                    '7mo semestre',
-                    '8vo semestre',
-                    '9no semestre',
-                    '10mo semestre',
-                    '12vo semestre',
-                    '13vo semestre',
-                ].map((semestre) => (
-                    <Picker.Item key={semestre} label={semestre} value={semestre} />
+                {[...Array(10)].map((_, index) => (
+                    <Picker.Item
+                        key={index}
+                        label={`${index + 1}º semestre`}
+                        value={`${index + 1}º semestre`}
+                    />
                 ))}
             </Picker>
 
@@ -133,26 +161,26 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         padding: 20,
-        backgroundColor: '#eaf4f4', // Color suave para el fondo
+        backgroundColor: '#eaf4f4',
         alignItems: 'center',
     },
     title: {
         fontSize: 28,
         fontWeight: 'bold',
-        color: '#1a535c', // Color oscuro pero agradable para el texto
+        color: '#1a535c',
         marginBottom: 20,
         textAlign: 'center',
     },
     input: {
-        backgroundColor: '#ffffff', // Fondo blanco limpio para inputs
+        backgroundColor: '#ffffff',
         padding: 15,
         marginVertical: 10,
         borderRadius: 10,
-        borderColor: '#4ecdc4', // Borde del input con un color llamativo
+        borderColor: '#4ecdc4',
         borderWidth: 2,
         width: '90%',
         fontSize: 16,
-        color: '#333', // Texto en un gris oscuro
+        color: '#333',
     },
     picker: {
         height: 50,
@@ -170,23 +198,6 @@ const styles = StyleSheet.create({
         color: '#1a535c',
         marginVertical: 10,
         textAlign: 'center',
-    },
-    buttonContainer: {
-        marginTop: 20,
-        width: '90%',
-        borderRadius: 10,
-        overflow: 'hidden',
-    },
-    button: {
-        backgroundColor: '#1a535c',
-        paddingVertical: 15,
-        borderRadius: 10,
-    },
-    buttonText: {
-        textAlign: 'center',
-        color: '#fff',
-        fontSize: 18,
-        fontWeight: 'bold',
     },
 });
 

@@ -4,8 +4,9 @@ import {Ionicons} from '@expo/vector-icons';
 import {Picker} from '@react-native-picker/picker';
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 import app from '../utils/firebase';
-import {collection, getDocs, addDoc, getFirestore, updateDoc, doc, deleteDoc} from 'firebase/firestore';
+import {collection,increment, getDocs, addDoc, getFirestore, updateDoc, doc, deleteDoc} from 'firebase/firestore';
 import {Alert} from 'react-native'; // Agregar esta importación también
+import { getAuth } from 'firebase/auth';
 
 const TasksScreen = () => {
     const [tasks, setTasks] = useState([]);
@@ -78,22 +79,29 @@ const TasksScreen = () => {
         fetchTasks();
     }, []);
 
-    // Manejo de tareas completadas
-    const handleToggleTask = async (taskId) => {
-        try {
-            const db = getFirestore(app);
+   // Manejo de tareas completadas
+const handleToggleTask = async (taskId) => {
+    try {
+        const db = getFirestore(app);
 
-            // Actualizar el estado en Firestore
-            await updateDoc(doc(db, "tareas", taskId), {
-                status: true
-            });
+        // Actualizar el estado de la tarea en Firestore
+        await updateDoc(doc(db, "tareas", taskId), {
+            status: true,
+        });
 
-            // Actualizar la interfaz obteniendo las tareas actualizadas
-            fetchTasks();
-        } catch (error) {
-            console.error("Error al completar la tarea:", error);
-        }
-    };
+        // Incrementar el contador de tareas completadas en Firestore
+        const userId = getAuth(app).currentUser.uid; // Obtén el UID del usuario autenticado
+        await updateDoc(doc(db, "users", userId), {
+            tasksCompleted: increment(1), // Incrementa en 1
+        });
+
+        // Actualizar la interfaz obteniendo las tareas actualizadas
+        fetchTasks();
+    } catch (error) {
+        console.error("Error al completar la tarea:", error);
+    }
+};
+
 
     // Agregar nueva tarea a Firestore
     const handleAddTask = async () => {

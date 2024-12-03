@@ -1,20 +1,82 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
-import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import { View, Text, TouchableOpacity, StyleSheet, Image, Alert } from 'react-native';
+import { getAuth, signOut } from 'firebase/auth';
+import { getFirestore, doc, getDoc } from 'firebase/firestore';
+import { useIsFocused } from '@react-navigation/native'; // Importar useIsFocused
+import app from '../utils/firebase'; // Configuración de Firebase
 
 const DashboardScreen = ({ navigation }) => {
     const [userName, setUserName] = useState(''); // Estado para almacenar el nombre del usuario
+    const db = getFirestore(app); // Inicializa Firestore
+    const isFocused = useIsFocused(); // Detecta si la pantalla está activa
 
-    useEffect(() => {
+    // Función para cerrar sesión
+    const logout = () => {
         const auth = getAuth();
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
-            if (user) {
-                setUserName(user.displayName || user.email);
-            }
-        });
+        signOut(auth)
+            .then(() => {
+                Alert.alert(
+                    "Cierre de Sesión",
+                    "Has cerrado sesión exitosamente.",
+                    [
+                        {
+                            text: "OK",
+                            onPress: () => navigation.replace("Auth"), // Redirige al login
+                        },
+                    ]
+                );
+            })
+            .catch((error) => {
+                Alert.alert(
+                    "Error",
+                    "Ocurrió un problema al cerrar sesión. Intenta nuevamente."
+                );
+                console.error(error);
+            });
+    };
 
-        return unsubscribe;
-    }, []);
+    // Confirmar cierre de sesión
+    const confirmLogout = () => {
+        Alert.alert(
+            "Confirmar Cierre de Sesión",
+            "¿Estás seguro de que deseas cerrar sesión?",
+            [
+                { text: "Cancelar", style: "cancel" },
+                { text: "Cerrar Sesión", onPress: logout, style: "destructive" },
+            ]
+        );
+    };
+
+    // Cargar datos del usuario desde Firestore
+    const fetchUserName = async () => {
+        const auth = getAuth();
+        const user = auth.currentUser;
+
+        if (user) {
+            try {
+                const userDoc = doc(db, 'users', user.uid); // Asume que los documentos están indexados por UID
+                const userSnap = await getDoc(userDoc);
+
+                if (userSnap.exists()) {
+                    const userData = userSnap.data();
+                    setUserName(userData.name || 'Usuario'); // Usa 'name' o un campo adecuado de tu colección
+                } else {
+                    console.error('El documento del usuario no existe');
+                    setUserName('Usuario');
+                }
+            } catch (error) {
+                console.error('Error al obtener el nombre del usuario desde Firestore:', error);
+                setUserName('Usuario');
+            }
+        }
+    };
+
+    // Efecto para cargar datos cuando la pantalla está activa
+    useEffect(() => {
+        if (isFocused) {
+            fetchUserName(); // Vuelve a cargar los datos cuando la pantalla está activa
+        }
+    }, [isFocused]);
 
     return (
         <View style={styles.container}>
@@ -51,6 +113,13 @@ const DashboardScreen = ({ navigation }) => {
                 onPress={() => navigation.navigate('Notes')}
             >
                 <Text style={styles.buttonText}>Notas</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+                style={styles.button}
+                onPress={confirmLogout} // Llama a la función de confirmación
+            >
+                <Text style={styles.buttonText}>Cerrar Sesión</Text>
             </TouchableOpacity>
         </View>
     );

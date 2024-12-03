@@ -39,7 +39,7 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'lightblue', // Fondo claro
+    backgroundColor: '#f0f8ff', // Fondo claro y suave
     marginTop: 20,
   },
 });

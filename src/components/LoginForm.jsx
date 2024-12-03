@@ -61,7 +61,7 @@ export default function LoginForm({ changeForm }) {
                 </TouchableOpacity>
 
                 <TouchableOpacity onPress={login} >
-                    <Text style={styles.btnText}> INCIAR SESIÓN </Text>
+                    <Text style={styles.btnText}> INICIAR SESIÓN </Text>
                 </TouchableOpacity>
             </View>
         </>
@@ -70,44 +70,62 @@ export default function LoginForm({ changeForm }) {
 
 const styles = StyleSheet.create({
     title: {
-        fontSize: 20,
-        marginBottom: 20,
-        marginTop: 5,
+        fontSize: 32,
+        marginBottom: 25,
+        marginTop: 15,
         textAlign: 'center',
         fontWeight: 'bold',
-        color: '#1E3040'
+        color: '#1E3040',
+        textShadowColor: 'rgba(0, 0, 0, 0.3)', // Sombra del texto
+        textShadowOffset: { width: 2, height: 2 },
+        textShadowRadius: 3,
     },
     input: {
-        borderWidth: 1,
+        borderWidth: 1.5,
         borderColor: 'black',
-        padding: 10,
-        marginBottom: 10, //separar los inputs
+        backgroundColor: '#f8f9fa', // Fondo claro en los inputs
+        padding: 15,
+        marginBottom: 15, // Espaciado más grande
         borderRadius: 30,
         fontSize: 18,
-        width: '80%',
-        height: 50,
+        width: '85%',
+        height: 55,
         paddingHorizontal: 20,
-        alignSelf: 'center'
+        alignSelf: 'center',
+        shadowColor: '#000', // Sombra para mayor profundidad
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+        elevation: 2,
     },
     error: {
-        borderColor: 'red',
-        borderWidth: 4,
+        borderColor: '#ff4d4d', // Rojo más vibrante
+        borderWidth: 2,
+        backgroundColor: '#ffe6e6', // Fondo tenue para resaltar errores
     },
     register: {
         flex: 1,
         justifyContent: 'flex-end',
-        marginBottom: 10,
+        marginBottom: 20,
+        alignItems: 'center', // Centra los botones
     },
     btnText: {
         color: 'white',
         fontWeight: 'bold',
-        fontSize: 18,
+        fontSize: 20, // Tamaño más grande
         textAlign: 'center',
-        padding: 10,
+        padding: 12,
         backgroundColor: '#1E3040',
-        borderRadius: 30,
-        marginTop: 10,
-        width: '80%',
-        alignSelf: 'center'
-    }
-})
+        borderRadius: 50, // Botones redondeados
+        marginTop: 15,
+        width: '85%',
+        alignSelf: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 5 },
+        shadowOpacity: 0.3,
+        shadowRadius: 6,
+        elevation: 5,
+        textTransform: 'uppercase', // Todo en mayúsculas
+        letterSpacing: 2, // Espaciado entre letras
+    },
+});
