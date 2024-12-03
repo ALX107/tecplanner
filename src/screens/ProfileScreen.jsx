@@ -1,39 +1,38 @@
 import React, { useState, useEffect, useContext } from "react";
 import { View, Text, TextInput, Button, StyleSheet, Alert, Switch } from "react-native";
-import { getAuth, updatePassword } from "firebase/auth";
-import { deleteUser } from "firebase/auth";
-import { getFirestore, doc, deleteDoc } from "firebase/firestore";
+import { getAuth, updatePassword, deleteUser } from "firebase/auth";
+import { getFirestore, doc, getDoc, deleteDoc } from "firebase/firestore";
 import { ThemeContext } from '../context/ThemeContext';
 
 const ProfileScreen = ({ navigation }) => {
-  const auth = getAuth();
   const [newPassword, setNewPassword] = useState("");
   const [message, setMessage] = useState("");
-  const db = getFirestore();
-  const [stats, setStats] = useState(null);
+  const [userData, setUserData] = useState(null); // Datos del usuario
   const { isDarkMode, toggleTheme } = useContext(ThemeContext);
+  const auth = getAuth();
+  const db = getFirestore();
 
-
-  //useEffect que trabaja las estadisticas
+  // Cargar datos del usuario desde Firestore
   useEffect(() => {
-    const fetchStats = async () => {
-      const auth = getAuth();
-      const db = getFirestore();
-  
-      const docRef = doc(db, 'users', auth.currentUser.uid);
-      const docSnap = await getDoc(docRef);
-  
-      if (docSnap.exists()) {
-        setStats(docSnap.data()); // Guardar los datos obtenidos en el estado
-      } else {
-        console.log('No hay datos para este usuario.');
+    const fetchUserData = async () => {
+      try {
+        const userDoc = doc(db, 'users', auth.currentUser.uid); // Documento del usuario
+        const userSnap = await getDoc(userDoc);
+
+        if (userSnap.exists()) {
+          setUserData(userSnap.data()); // Almacenar datos del usuario
+        } else {
+          console.log("No se encontraron datos para este usuario");
+        }
+      } catch (error) {
+        console.error("Error al cargar los datos del usuario:", error);
       }
     };
-  
-    fetchStats();
+
+    fetchUserData();
   }, []);
 
-
+  // Cambiar contraseña
   const handleChangePassword = () => {
     if (newPassword.length < 6) {
       setMessage("La contraseña debe tener al menos 6 caracteres.");
@@ -51,14 +50,11 @@ const ProfileScreen = ({ navigation }) => {
       });
   };
 
+  // Eliminar cuenta
   const handleDeleteAccount = async () => {
     try {
-      // Borra la información del usuario en Firestore
-      await deleteDoc(doc(db, "users", auth.currentUser.uid));
-
-      // Elimina la cuenta de Firebase Authentication
-      await deleteUser(auth.currentUser);
-
+      await deleteDoc(doc(db, "users", auth.currentUser.uid)); // Borra datos en Firestore
+      await deleteUser(auth.currentUser); // Elimina cuenta en Firebase Authentication
       console.log("Cuenta eliminada exitosamente.");
       navigation.navigate("Auth"); // Redirige al login
     } catch (error) {
@@ -70,31 +66,36 @@ const ProfileScreen = ({ navigation }) => {
     }
   };
 
+  // Confirmación antes de eliminar cuenta
   const confirmDeleteAccount = () => {
     Alert.alert(
       "Confirmar Eliminación",
       "¿Estás seguro de que deseas eliminar tu cuenta? Esta acción no se puede deshacer.",
       [
         { text: "Cancelar", style: "cancel" },
-        {
-          text: "Eliminar",
-          onPress: handleDeleteAccount,
-          style: "destructive",
-        },
+        { text: "Eliminar", onPress: handleDeleteAccount, style: "destructive" },
       ]
     );
   };
 
+  // Mostrar pantalla de carga mientras se obtienen los datos
+  if (!userData) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text>Cargando datos del perfil...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={isDarkMode ? styles.darkContainer : styles.lightContainer}>
       <Text style={styles.title}>Perfil del Usuario</Text>
-      <Text style={styles.info}>Correo: {auth.currentUser?.email}</Text>
-      {stats && (
-        <View>
-          <Text>Tareas Completadas: {stats.tasksCompleted || 0}</Text>
-          <Text>Promedio: {stats.averageGrade || "N/A"}</Text>
-        </View>
-      )}
+      <Text style={styles.info}>Nombre: {userData.name}</Text>
+      <Text style={styles.info}>Correo: {userData.email}</Text>
+      <Text style={styles.info}>Tareas Completadas: {userData.tasksCompleted || 0}</Text>
+      <Text style={styles.info}>Promedio General: {userData.averageGrade || "N/A"}</Text>
+
+      {/* Cambiar Contraseña */}
       <Text style={styles.subtitle}>Cambiar Contraseña:</Text>
       <TextInput
         style={styles.input}
@@ -103,12 +104,18 @@ const ProfileScreen = ({ navigation }) => {
         value={newPassword}
         onChangeText={setNewPassword}
       />
-        <View style={styles.toggleContainer}>
+      <Button title="Actualizar Contraseña" onPress={handleChangePassword} />
+
+      {/* Mensaje de confirmación o error */}
+      {message ? <Text style={styles.message}>{message}</Text> : null}
+
+      {/* Toggle de Modo Oscuro */}
+      <View style={styles.toggleContainer}>
         <Text style={styles.toggleText}>Modo Oscuro</Text>
         <Switch value={isDarkMode} onValueChange={toggleTheme} />
       </View>
-      <Button title="Actualizar Contraseña" onPress={handleChangePassword} />
-      {message ? <Text style={styles.message}>{message}</Text> : null}
+
+      {/* Eliminar Cuenta */}
       <Button
         title="Eliminar Cuenta"
         color="red"
@@ -148,7 +155,8 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontSize: 16,
     color: "green",
-  },lightContainer: {
+  },
+  lightContainer: {
     flex: 1,
     backgroundColor: '#ffffff', // Fondo claro
     padding: 20,
