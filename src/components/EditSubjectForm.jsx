@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import {View, Text, TextInput, TouchableOpacity, StyleSheet, Modal, Alert,} from 'react-native';
 import { Picker } from '@react-native-picker/picker';
-import { updateDoc, doc, getDocs, collection } from 'firebase/firestore';
+import { updateDoc, doc, getDocs, collection, query, where } from 'firebase/firestore';
 import { getFirestore } from 'firebase/firestore';
 import app from '../utils/firebase';
+import { getAuth } from 'firebase/auth';
 
 const EditSubjectForm = ({ visible, onClose, materia, onUpdate }) => {
     const [editedData, setEditedData] = useState({
@@ -33,15 +34,24 @@ const EditSubjectForm = ({ visible, onClose, materia, onUpdate }) => {
                 console.error('Usuario no autenticado');
                 return false;
             }
-    
+
             const q = query(
                 collection(db, 'materias'),
-                where('userId', '==', userId), // Filtra por el userId del usuario
+                where('userId', '==', userId),
                 where('codigo', '==', codigo)
             );
-    
+
             const querySnapshot = await getDocs(q);
-            return querySnapshot.docs.every((doc) => doc.id !== materia.id); // Asegúrate de que no coincida con otro documento
+
+            // Si no hay documentos con el mismo código o el único documento es el que estamos editando, es válido
+            if (
+                querySnapshot.empty ||
+                (querySnapshot.docs.length === 1 && querySnapshot.docs[0].id === materia.id)
+            ) {
+                return true;
+            }
+
+            return false; // El código ya existe en otra materia
         } catch (error) {
             console.error('Error al validar el código único:', error);
             return false;
@@ -59,7 +69,7 @@ const EditSubjectForm = ({ visible, onClose, materia, onUpdate }) => {
             Alert.alert('Error', 'Todos los campos son obligatorios.');
             return;
         }
-    
+
         const codigoEsUnico = await validarCodigoUnico(editedData.codigo);
         if (!codigoEsUnico) {
             Alert.alert('Error', 'El código ya existe. Por favor, usa un código único.');
