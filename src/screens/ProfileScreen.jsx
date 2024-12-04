@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext } from "react";
 import { View, Text, TextInput, Button, StyleSheet, Alert, Switch } from "react-native";
 import { getAuth, updatePassword, deleteUser } from "firebase/auth";
-import { getFirestore, doc, getDoc, updateDoc } from "firebase/firestore";
+import { getFirestore, doc, getDoc, updateDoc, deleteDoc } from "firebase/firestore";
 import { ThemeContext } from '../context/ThemeContext';
 
 const ProfileScreen = ({ navigation }) => {
