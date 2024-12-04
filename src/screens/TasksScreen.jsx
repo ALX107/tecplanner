@@ -152,6 +152,12 @@ const TasksScreen = () => {
                 status: false, // Cambiar el estad
             });
 
+            // Incrementar el contador de tareas completadas en Firestore
+            const userId = getAuth(app).currentUser.uid; // Obtén el UID del usuario autenticado
+            await updateDoc(doc(db, "users", userId), {
+                tasksCompleted: increment(-1), // Incrementa en 1
+            });
+
             // Actualizar la interfaz obteniendo las tareas actualizadas
             fetchTasks();
         } catch (error) {
