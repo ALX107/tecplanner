@@ -1,11 +1,11 @@
-import React, {useState, useEffect} from 'react';
-import {View, Modal, Text, StyleSheet, FlatList, TouchableOpacity, Pressable, TextInput} from 'react-native';
-import {Ionicons} from '@expo/vector-icons';
-import {Picker} from '@react-native-picker/picker';
+import React, { useState, useEffect } from 'react';
+import { View, Modal, Text, StyleSheet, FlatList, TouchableOpacity, Pressable, TextInput } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { Picker } from '@react-native-picker/picker';
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 import app from '../utils/firebase';
-import {collection,increment, getDocs, addDoc, getFirestore, updateDoc, doc, deleteDoc, query, where} from 'firebase/firestore';
-import {Alert} from 'react-native'; // Agregar esta importación también
+import { collection, increment, getDocs, addDoc, getFirestore, updateDoc, doc, deleteDoc, query, where } from 'firebase/firestore';
+import { Alert } from 'react-native'; // Agregar esta importación también
 import { getAuth } from 'firebase/auth';
 
 const TasksScreen = () => {
@@ -20,37 +20,41 @@ const TasksScreen = () => {
     const [editingTask, setEditingTask] = useState(null);
     const [materias, setMaterias] = useState([]); // Nuevo estado para materias
 
-    // Función para obtener materias
     // Función para obtener materias filtradas por el usuario autenticado
-const fetchMaterias = async () => {
-    try {
-        const db = getFirestore(app);
-        const auth = getAuth(app);
-        const userId = auth.currentUser?.uid; // Obtener el UID del usuario autenticado
+    const fetchMaterias = async () => {
+        try {
+            const db = getFirestore(app);
+            const auth = getAuth(app);
+            const userId = auth.currentUser?.uid; // Obtener el UID del usuario autenticado
 
-        if (!userId) {
-            console.error("Usuario no autenticado.");
-            return;
+            if (!userId) {
+                console.error("Usuario no autenticado.");
+                return;
+            }
+
+            // Filtrar materias por userId
+            const q = query(
+                collection(db, "materias"),
+                where("userId", "==", userId)
+            );
+
+            const querySnapshot = await getDocs(q);
+            const materiasData = querySnapshot.docs.map((doc) => ({
+                id: doc.id,
+                codigo: doc.data().codigo,
+                nombre: doc.data().nombre || doc.data().codigo,
+            }));
+
+            setMaterias(materiasData); // Actualiza el estado con las materias del usuario
+        } catch (error) {
+            console.error("Error al obtener las materias:", error);
+            Alert.alert(
+                "Error",
+                "Hubo un problema al obtener las materias. Por favor, inténtalo de nuevo.",
+                [{ text: "OK" }]
+            );
         }
-
-        // Filtrar materias por userId
-        const q = query(
-            collection(db, "materias"),
-            where("userId", "==", userId)
-        );
-
-        const querySnapshot = await getDocs(q);
-        const materiasData = querySnapshot.docs.map((doc) => ({
-            id: doc.id,
-            codigo: doc.data().codigo,
-            nombre: doc.data().nombre || doc.data().codigo,
-        }));
-
-        setMaterias(materiasData); // Actualiza el estado con las materias del usuario
-    } catch (error) {
-        console.error("Error al obtener las materias:", error);
-    }
-};
+    };
 
 
     // Obtener tareas desde Firestore
@@ -58,22 +62,22 @@ const fetchMaterias = async () => {
         try {
             const auth = getAuth(app);
             const userId = auth.currentUser?.uid;
-    
+
             if (!userId) {
                 console.error("Usuario no autenticado.");
                 return;
             }
-    
+
             const db = getFirestore(app);
             const q = query(
                 collection(db, "tareas"),
                 where("userId", "==", userId) // Filtrar tareas por userId
             );
-    
+
             const querySnapshot = await getDocs(q);
             const pendingTasks = [];
             const completedTasksList = [];
-    
+
             querySnapshot.forEach((doc) => {
                 const data = doc.data();
                 const task = {
@@ -83,66 +87,105 @@ const fetchMaterias = async () => {
                     fechaEntrega: data.fechaEntrega.toDate(),
                     completed: data.status,
                 };
-    
+
                 if (data.status) {
                     completedTasksList.push(task);
                 } else {
                     pendingTasks.push(task);
                 }
             });
-    
+
             setTasks(pendingTasks);
             setCompletedTasks(completedTasksList);
         } catch (error) {
             console.error("Error al obtener las tareas:", error);
+            Alert.alert(
+                "Error",
+                "Hubo un problema al obtener las tareas. Por favor, inténtalo de nuevo.",
+                [{ text: "OK" }]
+            );
         }
     };
-    
-    
+
+
 
     useEffect(() => {
         fetchMaterias();
         fetchTasks();
     }, []);
 
-   // Manejo de tareas completadas
-const handleToggleTask = async (taskId) => {
-    try {
-        const db = getFirestore(app);
+    // Manejo de tareas completadas
+    const handleToggleTask = async (taskId) => {
+        try {
+            const db = getFirestore(app);
 
-        // Actualizar el estado de la tarea en Firestore
-        await updateDoc(doc(db, "tareas", taskId), {
-            status: true,
-        });
+            // Actualizar el estado de la tarea en Firestore
+            await updateDoc(doc(db, "tareas", taskId), {
+                status: true,
+            });
 
-        // Incrementar el contador de tareas completadas en Firestore
-        const userId = getAuth(app).currentUser.uid; // Obtén el UID del usuario autenticado
-        await updateDoc(doc(db, "users", userId), {
-            tasksCompleted: increment(1), // Incrementa en 1
-        });
+            // Incrementar el contador de tareas completadas en Firestore
+            const userId = getAuth(app).currentUser.uid; // Obtén el UID del usuario autenticado
+            await updateDoc(doc(db, "users", userId), {
+                tasksCompleted: increment(1), // Incrementa en 1
+            });
 
-        // Actualizar la interfaz obteniendo las tareas actualizadas
-        fetchTasks();
-    } catch (error) {
-        console.error("Error al completar la tarea:", error);
-    }
-};
+            // Actualizar la interfaz obteniendo las tareas actualizadas
+            fetchTasks();
+        } catch (error) {
+            console.error("Error al completar la tarea:", error);
+            Alert.alert(
+                "Error",
+                "Hubo un problema al completar la tarea. Por favor, inténtalo de nuevo.",
+                [{ text: "OK" }]
+            );
+        }
+    };
 
+    //manejo de regresar de completadas a tareas pendientes
+    const handleMoveToPending = async (taskId) => {
+        try {
+            const db = getFirestore(app);
+
+            // Actualizar el estado de la tarea en Firestore
+            await updateDoc(doc(db, "tareas", taskId), {
+                status: false, // Cambiar el estad
+            });
+
+            // Actualizar la interfaz obteniendo las tareas actualizadas
+            fetchTasks();
+        } catch (error) {
+            console.error("Error al mover la tarea a tareas pendientes:", error);
+            Alert.alert(
+                "Error",
+                "Hubo un problema al mover la tarea a pendientes. Por favor, inténtalo de nuevo.",
+                [{ text: "OK" }]
+            );
+        }
+    };
 
     // Agregar nueva tarea a Firestore
     const handleAddTask = async () => {
         const auth = getAuth(app);
         const userId = auth.currentUser?.uid; // Obtén el UID del usuario autenticado
-    
+
         if (!userId) {
             Alert.alert("Error", "Usuario no autenticado.");
             return;
         }
-    
+
+        if (!selectedSubject || !taskTitle || !dueDate) {
+            Alert.alert(
+                "Campos incompletos",
+                "Por favor, complete todos los campos.",
+                [{ text: "OK" }]
+            );
+        }
+
         if (taskTitle && selectedSubject && dueDate) {
             try {
                 const db = getFirestore(app);
-    
+
                 if (isEditMode && editingTask) {
                     // Actualizar tarea existente
                     await updateDoc(doc(db, "tareas", editingTask.id), {
@@ -162,7 +205,7 @@ const handleToggleTask = async (taskId) => {
                         status: false,
                     });
                 }
-    
+
                 fetchTasks();
                 setTaskTitle('');
                 setSelectedSubject(null);
@@ -172,11 +215,15 @@ const handleToggleTask = async (taskId) => {
                 setEditingTask(null);
             } catch (error) {
                 console.error("Error al gestionar la tarea:", error);
-                Alert.alert("Error", `No se pudo gestionar la tarea: ${error.message}`);
+                Alert.alert(
+                    "Error",
+                    "Hubo un problema al agregar la tarea. Por favor, inténtalo de nuevo.",
+                    [{ text: "OK" }]
+                );
             }
         }
     };
-    
+
 
     // Función para manejar la edición
     const handleEditTask = (task) => {
@@ -207,6 +254,11 @@ const handleToggleTask = async (taskId) => {
                             fetchTasks();
                         } catch (error) {
                             console.error("Error al eliminar la tarea:", error);
+                            Alert.alert(
+                                "Error",
+                                "Hubo un problema al eliminar la tarea. Por favor, inténtalo de nuevo.",
+                                [{ text: "OK" }]
+                            );
                         }
                     },
                     style: "destructive"
@@ -215,16 +267,17 @@ const handleToggleTask = async (taskId) => {
         );
     };
 
-    const renderTask = ({item}) => (
+    //MUESTRA LISTA DE TAREAS PENDIENTES
+    const renderTask = ({ item }) => (
         <View style={[styles.taskItem]}>
             <Pressable
                 style={styles.checkbox}
                 onPress={() => handleToggleTask(item.id)}
             >
                 {item.completed ? (
-                    <Ionicons name="checkmark-circle" size={24} color="white"/>
+                    <Ionicons name="checkmark-circle" size={24} color="white" />
                 ) : (
-                    <Ionicons name="ellipse-outline" size={24} color="white"/>
+                    <Ionicons name="ellipse-outline" size={24} color="white" />
                 )}
             </Pressable>
             <View style={styles.taskContent}>
@@ -239,13 +292,13 @@ const handleToggleTask = async (taskId) => {
                     style={styles.editButton}
                     onPress={() => handleEditTask(item)}
                 >
-                    <Ionicons name="pencil" size={24} color="white"/>
+                    <Ionicons name="pencil" size={24} color="white" />
                 </TouchableOpacity>
                 <TouchableOpacity
                     style={styles.deleteButton}
                     onPress={() => handleDeleteTask(item.id)}
                 >
-                    <Ionicons name="trash" size={24} color="white"/>
+                    <Ionicons name="trash" size={24} color="white" />
                 </TouchableOpacity>
             </View>
         </View>
@@ -273,10 +326,18 @@ const handleToggleTask = async (taskId) => {
             <FlatList
                 data={completedTasks}
                 keyExtractor={(item) => item.id}
-                renderItem={({item}) => (
+                renderItem={({ item }) => (
                     <View style={[styles.taskItem, styles.taskItemCompleted]}>
-                        <Ionicons name="checkmark-circle" size={24} color="white" style={styles.checkbox}/>
-                        <Text style={[styles.taskText, styles.taskTextCompleted]}>{item.descripcion}</Text>
+                        <Ionicons name="checkmark-circle" size={24} color="white" style={styles.checkbox} />
+                        <View style={styles.taskContent}>
+                            <Text style={[styles.taskText, styles.taskTextCompleted]}>{item.descripcion}</Text>
+                        </View>
+                        <TouchableOpacity
+                            style={styles.revertButton}
+                            onPress={() => handleMoveToPending(item.id)}
+                        >
+                            <Ionicons name="arrow-undo" size={24} color="white" />
+                        </TouchableOpacity>
                     </View>
                 )}
                 contentContainerStyle={styles.taskList}
@@ -299,7 +360,7 @@ const handleToggleTask = async (taskId) => {
                             onValueChange={(itemValue) => setSelectedSubject(itemValue)}
                             style={styles.picker}
                         >
-                            <Picker.Item label="Selecciona una materia" value={null}/>
+                            <Picker.Item label="Selecciona una materia" value={null} />
                             {materias.map((materia) => (
                                 <Picker.Item
                                     key={materia.id}
@@ -367,7 +428,7 @@ const handleToggleTask = async (taskId) => {
                 style={styles.fab}
                 onPress={() => setModalVisible(true)}
             >
-                <Ionicons name="add" size={28} color="white"/>
+                <Ionicons name="add" size={28} color="white" />
             </TouchableOpacity>
         </View>
     );
@@ -532,7 +593,12 @@ const styles = StyleSheet.create({
         padding: 5,
         marginLeft: 10,
     },
+    revertButton: {
+        padding: 5,
+        marginLeft: 10,
+        backgroundColor: '#3498db',
+        borderRadius: 8,
+    },
 });
-
 
 export default TasksScreen;
