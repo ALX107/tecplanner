@@ -116,7 +116,6 @@ const ProfileScreen = ({ navigation }) => {
       <Text style={styles.info}>Nombre: {userData.name}</Text>
       <Text style={styles.info}>Correo: {userData.email}</Text>
       <Text style={styles.info}>Tareas Completadas: {userData.tasksCompleted || 0}</Text>
-      <Text style={styles.info}>Promedio General: {userData.averageGrade || "N/A"}</Text>
 
       {/* Actualizar Nombre */}
       <Text style={styles.subtitle}>Actualizar Nombre:</Text>
