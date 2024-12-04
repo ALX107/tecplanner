@@ -45,7 +45,7 @@ const styles = StyleSheet.create({
 
         marginTop: 50,
 
-        marginBottom: 30,
+        marginBottom: 15,
 
         alignSelf: 'center',
 
