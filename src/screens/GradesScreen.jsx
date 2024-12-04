@@ -86,14 +86,55 @@ const eliminarMateria = async (id) => {
 };
 
     // Actualizar la lista local después de editar
-    const actualizarMateria = (updatedMateria) => {
-        setMaterias((prevMaterias) =>
-            prevMaterias.map((materia) =>
-                materia.id === updatedMateria.id ? updatedMateria : materia
-            )
-        );
+    const actualizarMateria = async (updatedMateria) => {
+        try {
+            const userId = getAuth(app).currentUser?.uid;
+            if (!userId) {
+                console.error('Usuario no autenticado.');
+                return;
+            }
+    
+            // Actualizar la materia en Firestore
+            const db = getFirestore(app);
+            const docRef = doc(db, 'materias', updatedMateria.id);
+            await updateDoc(docRef, {
+                nombre: updatedMateria.nombre,
+                calificaciones: updatedMateria.calificaciones,
+                codigo: updatedMateria.codigo,
+                docente: updatedMateria.docente,
+                semestre: updatedMateria.semestre,
+            });
+    
+            // Actualizar el promedio general
+            await actualizarPromedioGeneral(userId);
+    
+            // Actualizar el estado local
+            setMaterias((prevMaterias) =>
+                prevMaterias.map((materia) =>
+                    materia.id === updatedMateria.id ? updatedMateria : materia
+                )
+            );
+        } catch (error) {
+            console.error('Error al actualizar la materia:', error);
+        }
     };
+    
 
+    const guardarCalificaciones = async (materiaId, calificaciones) => {
+        try {
+            const db = getFirestore(app);
+            const userId = getAuth(app).currentUser.uid;
+    
+            // Actualizar las calificaciones de la materia
+            await updateDoc(doc(db, 'materias', materiaId), { calificaciones });
+    
+            // Actualizar el promedio general del usuario
+            await actualizarPromedioGeneral(userId);
+        } catch (error) {
+            console.error('Error al guardar calificaciones:', error);
+        }
+    };
+    
     const actualizarPromedioGeneral = async (userId) => {
         try {
             const db = getFirestore(app);
@@ -110,43 +151,25 @@ const eliminarMateria = async (id) => {
                 const data = doc.data();
                 if (data.calificaciones && data.calificaciones.length > 0) {
                     const promedioMateria =
-                        data.calificaciones.reduce((a, b) => a + b, 0) /
-                        data.calificaciones.length;
+                        data.calificaciones.reduce((a, b) => a + b, 0) / data.calificaciones.length;
                     totalSum += promedioMateria;
                     totalSubjects += 1;
                 }
             });
     
             // Calcular el promedio general
-            const averageGrade = totalSubjects > 0 ? totalSum / totalSubjects : 0;
+            const promedioGeneral = totalSubjects > 0 ? totalSum / totalSubjects : 0;
     
-            // Actualizar en Firestore el campo averageGrade del usuario
+            // Actualizar en Firestore
             await updateDoc(doc(db, 'users', userId), {
-                averageGrade,
+                promedioGeneral,
             });
-            console.log('Promedio General actualizado:', averageGrade);
+            console.log('Promedio General actualizado:', promedioGeneral);
         } catch (error) {
             console.error('Error al actualizar el promedio general:', error);
         }
     };
     
-    // Llama a esta función cada vez que actualices calificaciones
-    // Por ejemplo, después de guardar nuevas calificaciones:
-    const guardarCalificaciones = async (materiaId, calificaciones) => {
-        try {
-            const db = getFirestore(app);
-    
-            // Actualizar la materia con las nuevas calificaciones
-            await updateDoc(doc(db, 'materias', materiaId), { calificaciones });
-    
-            // Actualizar promedio general del usuario
-            const userId = getAuth(app).currentUser.uid; // Obtén el UID del usuario autenticado
-            await actualizarPromedioGeneral(userId);
-        } catch (error) {
-            console.error('Error al guardar calificaciones:', error);
-        }
-    };
-
 
     return (
         <View style={styles.container}>

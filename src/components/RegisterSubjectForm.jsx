@@ -89,6 +89,8 @@ const agregarMateria = async () => {
         const docRef = await addDoc(collection(db, 'materias'), datosParaFirestore);
         console.log('Materia agregada con ID:', docRef.id);
 
+        await actualizarPromedioGeneral(userId);
+
         onAddSubject({ ...datosParaFirestore, id: docRef.id });
 
         setNewMateria({
