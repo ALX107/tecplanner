@@ -1,34 +1,58 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, Modal, StyleSheet, TouchableOpacity } from 'react-native';
-import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, getFirestore } from "firebase/firestore";
-import app from "../utils/firebase"; // Importa tu archivo firebase.js
-import NoteForm from '../components/NoteForm'; // Importa el nuevo componente
+import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where, getFirestore } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
+import app from '../utils/firebase';
+import NoteForm from '../components/NoteForm';
 
-const db = getFirestore(app); // Instancia de Firestore
+const db = getFirestore(app);
 
 const NotesScreen = () => {
     const [notas, setNotas] = useState([]);
     const [isEditing, setIsEditing] = useState(false);
     const [selectedNote, setSelectedNote] = useState(null);
-    const [modalVisible, setModalVisible] = useState(false); // Controla la visibilidad del modal
+    const [modalVisible, setModalVisible] = useState(false);
 
-    // Cargar las notas desde Firebase
-    useEffect(() => {
-        const fetchNotas = async () => {
-            const snapshot = await getDocs(collection(db, "notas"));
+    const auth = getAuth(app);
+
+    // Cargar notas del usuario autenticado
+    const fetchNotas = async () => {
+        try {
+            const userId = auth.currentUser?.uid;
+            if (!userId) {
+                console.error("Usuario no autenticado.");
+                return;
+            }
+
+            const q = query(
+                collection(db, "notas"),
+                where("userId", "==", userId)
+            );
+
+            const snapshot = await getDocs(q);
             const notesData = snapshot.docs.map((doc) => ({
                 id: doc.id,
                 ...doc.data(),
             }));
             setNotas(notesData);
-        };
+        } catch (error) {
+            console.error("Error al obtener las notas:", error);
+        }
+    };
 
+    useEffect(() => {
         fetchNotas();
     }, []);
 
     // Guardar nueva nota o actualizar
     const handleSaveNote = async (titulo, contenido) => {
         try {
+            const userId = auth.currentUser?.uid;
+            if (!userId) {
+                console.error("Usuario no autenticado.");
+                return;
+            }
+
             if (isEditing && selectedNote) {
                 const noteRef = doc(db, "notas", selectedNote.id);
                 await updateDoc(noteRef, { titulo, contenido });
@@ -42,12 +66,12 @@ const NotesScreen = () => {
                     titulo,
                     contenido,
                     fechaCreacion: new Date().toISOString(),
+                    userId,
                 };
                 const docRef = await addDoc(collection(db, "notas"), nuevaNota);
                 setNotas((prevNotas) => [...prevNotas, { id: docRef.id, ...nuevaNota }]);
             }
 
-            // Limpiar y cerrar
             setModalVisible(false);
             setSelectedNote(null);
             setIsEditing(false);
@@ -63,11 +87,15 @@ const NotesScreen = () => {
         setModalVisible(true);
     };
 
-    // Borrar una nota
+    // Eliminar una nota
     const handleDeleteNote = async (id) => {
-        const noteRef = doc(db, "notas", id);
-        await deleteDoc(noteRef);
-        setNotas((prevNotas) => prevNotas.filter((nota) => nota.id !== id));
+        try {
+            const noteRef = doc(db, "notas", id);
+            await deleteDoc(noteRef);
+            setNotas((prevNotas) => prevNotas.filter((nota) => nota.id !== id));
+        } catch (error) {
+            console.error("Error al eliminar la nota:", error);
+        }
     };
 
     return (
