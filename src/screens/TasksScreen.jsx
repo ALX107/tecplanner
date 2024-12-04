@@ -4,7 +4,7 @@ import {Ionicons} from '@expo/vector-icons';
 import {Picker} from '@react-native-picker/picker';
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 import app from '../utils/firebase';
-import {collection,increment, getDocs, addDoc, getFirestore, updateDoc, doc, deleteDoc} from 'firebase/firestore';
+import {collection,increment, getDocs, addDoc, getFirestore, updateDoc, doc, deleteDoc, query, where} from 'firebase/firestore';
 import {Alert} from 'react-native'; // Agregar esta importación también
 import { getAuth } from 'firebase/auth';
 
@@ -21,35 +21,59 @@ const TasksScreen = () => {
     const [materias, setMaterias] = useState([]); // Nuevo estado para materias
 
     // Función para obtener materias
-    const fetchMaterias = async () => {
-        try {
-            const db = getFirestore(app);
-            const querySnapshot = await getDocs(collection(db, "materias"));
-            const materiasData = [];
+    // Función para obtener materias filtradas por el usuario autenticado
+const fetchMaterias = async () => {
+    try {
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const userId = auth.currentUser?.uid; // Obtener el UID del usuario autenticado
 
-            querySnapshot.forEach((doc) => {
-                const data = doc.data();
-                materiasData.push({
-                    id: doc.id,
-                    codigo: data.codigo,
-                    nombre: data.nombre || data.codigo
-                });
-            });
-
-            setMaterias(materiasData);
-        } catch (error) {
-            console.error("Error al obtener las materias:", error);
+        if (!userId) {
+            console.error("Usuario no autenticado.");
+            return;
         }
-    };
+
+        // Filtrar materias por userId
+        const q = query(
+            collection(db, "materias"),
+            where("userId", "==", userId)
+        );
+
+        const querySnapshot = await getDocs(q);
+        const materiasData = querySnapshot.docs.map((doc) => ({
+            id: doc.id,
+            codigo: doc.data().codigo,
+            nombre: doc.data().nombre || doc.data().codigo,
+        }));
+
+        setMaterias(materiasData); // Actualiza el estado con las materias del usuario
+    } catch (error) {
+        console.error("Error al obtener las materias:", error);
+    }
+};
+
 
     // Obtener tareas desde Firestore
     const fetchTasks = async () => {
         try {
+            const auth = getAuth(app);
+            const userId = auth.currentUser?.uid;
+    
+            if (!userId) {
+                console.error("Usuario no autenticado.");
+                return;
+            }
+    
             const db = getFirestore(app);
-            const querySnapshot = await getDocs(collection(db, "tareas"));
+            const q = query(
+                collection(db, "tareas"),
+                where("userId", "==", userId) // Filtrar tareas por userId
+            );
+    
+            const querySnapshot = await getDocs(q);
             const pendingTasks = [];
             const completedTasksList = [];
-
+    
             querySnapshot.forEach((doc) => {
                 const data = doc.data();
                 const task = {
@@ -59,20 +83,22 @@ const TasksScreen = () => {
                     fechaEntrega: data.fechaEntrega.toDate(),
                     completed: data.status,
                 };
-
+    
                 if (data.status) {
                     completedTasksList.push(task);
                 } else {
                     pendingTasks.push(task);
                 }
             });
-
+    
             setTasks(pendingTasks);
             setCompletedTasks(completedTasksList);
         } catch (error) {
             console.error("Error al obtener las tareas:", error);
         }
     };
+    
+    
 
     useEffect(() => {
         fetchMaterias();
@@ -105,28 +131,38 @@ const handleToggleTask = async (taskId) => {
 
     // Agregar nueva tarea a Firestore
     const handleAddTask = async () => {
+        const auth = getAuth(app);
+        const userId = auth.currentUser?.uid; // Obtén el UID del usuario autenticado
+    
+        if (!userId) {
+            Alert.alert("Error", "Usuario no autenticado.");
+            return;
+        }
+    
         if (taskTitle && selectedSubject && dueDate) {
             try {
                 const db = getFirestore(app);
-
+    
                 if (isEditMode && editingTask) {
                     // Actualizar tarea existente
                     await updateDoc(doc(db, "tareas", editingTask.id), {
+                        userId, // Asegúrate de que userId esté en la tarea
                         materia: selectedSubject,
                         descripcion: taskTitle,
                         fechaEntrega: dueDate,
-                        status: false
+                        status: false,
                     });
                 } else {
                     // Crear nueva tarea
                     await addDoc(collection(db, "tareas"), {
+                        userId, // Incluye el userId
                         materia: selectedSubject,
                         descripcion: taskTitle,
                         fechaEntrega: dueDate,
-                        status: false
+                        status: false,
                     });
                 }
-
+    
                 fetchTasks();
                 setTaskTitle('');
                 setSelectedSubject(null);
@@ -136,9 +172,11 @@ const handleToggleTask = async (taskId) => {
                 setEditingTask(null);
             } catch (error) {
                 console.error("Error al gestionar la tarea:", error);
+                Alert.alert("Error", `No se pudo gestionar la tarea: ${error.message}`);
             }
         }
     };
+    
 
     // Función para manejar la edición
     const handleEditTask = (task) => {

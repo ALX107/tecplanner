@@ -23,14 +23,18 @@ const MainScreen = ({ navigation }) => {
             try {
                 const auth = getAuth(app);
                 const userId = auth.currentUser?.uid;
+    
                 if (!userId) {
-                    console.error('Usuario no autenticado');
+                    console.error("Usuario no autenticado.");
                     return;
                 }
     
+                const db = getFirestore(app);
+    
+                // Filtrar materias por userId
                 const q = query(
-                    collection(db, 'materias'),
-                    where('userId', '==', userId)
+                    collection(db, "materias"),
+                    where("userId", "==", userId)
                 );
     
                 const querySnapshot = await getDocs(q);
@@ -41,12 +45,13 @@ const MainScreen = ({ navigation }) => {
     
                 setMaterias(materiasData);
             } catch (error) {
-                console.error('Error al obtener las materias: ', error);
+                console.error("Error al obtener las materias:", error);
             }
         };
     
         fetchMaterias();
-    }, []); // Asegúrate de que el array de dependencias esté vacío
+    }, []);
+    
     
 
     // Agregar una nueva materia
