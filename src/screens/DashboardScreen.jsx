@@ -116,7 +116,7 @@ const DashboardScreen = ({ navigation }) => {
             </TouchableOpacity>
 
             <TouchableOpacity
-                style={styles.button}
+                style={styles.buttonLogout}
                 onPress={confirmLogout} // Llama a la función de confirmación
             >
                 <Text style={styles.buttonText}>Cerrar Sesión</Text>
@@ -164,6 +164,20 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         textAlign: 'center',
     },
+    buttonLogout: {
+        backgroundColor: '#FF4D4D',
+        paddingVertical: 10, // Botones más grandes
+        paddingHorizontal: 35,
+        borderRadius: 12,
+        alignItems: 'center',
+        marginVertical: 10,
+        width: '85%', // Botones más amplios
+        elevation: 4, // Sombra en Android
+        shadowColor: '#000', // Sombra en iOS
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+    }
 });
 
 export default DashboardScreen;
