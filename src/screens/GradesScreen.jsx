@@ -7,6 +7,7 @@ import ViewGradesScreen from './ViewGradesScreen';
 import { updateDoc, setDoc, getFirestore, collection, getDocs, doc, query, where, deleteDoc, addDoc, getDoc } from 'firebase/firestore';
 import app from '../utils/firebase';
 import { getAuth } from 'firebase/auth';
+import { useFocusEffect } from '@react-navigation/native';
 
 const Stack = createStackNavigator();
 
@@ -55,7 +56,42 @@ const MainScreen = ({ navigation }) => {
         fetchMaterias();
     }, []);
 
+    useFocusEffect(
+        React.useCallback(() => {
+            const fetchMaterias = async () => {
+                try {
+                    const auth = getAuth(app);
+                    const userId = auth.currentUser?.uid;
 
+                    if (!userId) {
+                        console.error("Usuario no autenticado.");
+                        return;
+                    }
+
+                    const db = getFirestore(app);
+
+                    // Filtrar materias por userId
+                    const q = query(
+                        collection(db, "materias"),
+                        where("userId", "==", userId)
+                    );
+
+                    const querySnapshot = await getDocs(q);
+                    const materiasData = querySnapshot.docs.map((doc) => ({
+                        id: doc.id,
+                        ...doc.data(),
+                    }));
+
+                    setMaterias(materiasData);
+                    calcularPromedios(materiasData);
+                } catch (error) {
+                    console.error("Error al obtener las materias:", error);
+                }
+            };
+
+            fetchMaterias();
+        }, [])
+    );
 
     // Agregar una nueva materia
     const agregarMateria = (materia) => {
@@ -80,9 +116,11 @@ const MainScreen = ({ navigation }) => {
             console.log(`Documento con ID ${id} eliminado correctamente`);
 
             // Actualizar el estado local
-            setMaterias((prevMaterias) =>
-                prevMaterias.filter((materia) => materia.id !== id)
-            );
+            const materiasActualizadas = materias.filter((materia) => materia.id !== id);
+            setMaterias(materiasActualizadas);
+
+            // Recalcular promedios después de la eliminación
+            calcularPromedios(materiasActualizadas);
         } catch (error) {
             console.error('Error al eliminar la materia: ', error.message);
         }
@@ -122,41 +160,45 @@ const MainScreen = ({ navigation }) => {
     // Función para calcular promedios
     const calcularPromedios = async (materiasData) => {
         const promediosSemestre = {};
-        let sumaTotal = 0;
-        let materiasConCalificaciones = 0;
+        let sumaTotalSemestres = 0;
+        let totalSemestres = 0;
 
+        // Iterar por las materias para agrupar por semestre
         materiasData.forEach((materia) => {
-            if (materia.calificaciones && materia.calificaciones.length > 0) {
-                // Calcular promedio de la materia
-                const promedioMateria = materia.calificaciones.reduce((a, b) => a + b, 0) /
-                    materia.calificaciones.length;
+            // Usar el promedio de la materia directamente desde la base de datos
+            const promedioMateria = materia.promedio;
 
-                // Agrupar por semestre
-                if (!promediosSemestre[materia.semestre]) {
-                    promediosSemestre[materia.semestre] = {
-                        suma: 0,
-                        cantidad: 0
-                    };
-                }
+            // Ignorar materias sin promedio o con promedio igual a 0
+            if (promedioMateria === undefined || promedioMateria === 0) return;
 
-                promediosSemestre[materia.semestre].suma += promedioMateria;
-                promediosSemestre[materia.semestre].cantidad += 1;
-
-                sumaTotal += promedioMateria;
-                materiasConCalificaciones += 1;
+            // Agrupar por semestre
+            if (!promediosSemestre[materia.semestre]) {
+                promediosSemestre[materia.semestre] = {
+                    suma: 0,
+                    cantidad: 0,
+                };
             }
+
+            promediosSemestre[materia.semestre].suma += promedioMateria;
+            promediosSemestre[materia.semestre].cantidad += 1;
         });
 
         // Calcular promedio final por semestre
         const promediosFinales = {};
-        Object.keys(promediosSemestre).forEach(semestre => {
-            promediosFinales[semestre] = promediosSemestre[semestre].suma /
+        Object.keys(promediosSemestre).forEach((semestre) => {
+            const promedioSemestre = promediosSemestre[semestre].suma /
                 promediosSemestre[semestre].cantidad;
+            promediosFinales[semestre] = promedioSemestre;
+
+            // Acumular para el cálculo del promedio general
+            sumaTotalSemestres += promedioSemestre;
+            totalSemestres += 1;
         });
 
-        // Calcular promedio general
-        const promedioGeneralCalculado = materiasConCalificaciones > 0 ?
-            sumaTotal / materiasConCalificaciones : 0;
+        // Calcular promedio general basado en los promedios por semestre
+        const promedioGeneralCalculado = totalSemestres > 0
+            ? sumaTotalSemestres / totalSemestres
+            : 0;
 
         setPromediosPorSemestre(promediosFinales);
         setPromedioGeneral(promedioGeneralCalculado);
@@ -182,59 +224,51 @@ const MainScreen = ({ navigation }) => {
 
     return (
         <View style={styles.container}>
-            {/* Mostrar Promedio General */}
-            <View style={styles.promedioGeneralContainer}>
-                <Text style={styles.promedioGeneralTitle}>
-                    Promedio General
-                </Text>
-                <Text style={styles.promedioGeneralValue}>
-                    {promedioGeneral.toFixed(2)}
-                </Text>
-            </View>
 
-            {/* Mostrar Promedios por Semestre */}
-            <View style={styles.promediosSemestreContainer}>
-                <Text style={styles.promediosSemestreTitle}>
-                    Promedios por Semestre
-                </Text>
-                {Object.entries(promediosPorSemestre).map(([semestre, promedio]) => (
-                    <View key={semestre} style={styles.semestreRow}>
-                        <Text style={styles.semestreText}>
-                            {semestre}:
-                        </Text>
-                        <Text style={styles.semestrePromedio}>
-                            {promedio.toFixed(2)}
-                        </Text>
-                    </View>
-                ))}
-            </View>
-
-            <TouchableOpacity
-                style={styles.addButton}
-                onPress={() => setShowForm(!showForm)}
-            >
-                <Text style={styles.addButtonText}>
-                    {showForm ? 'CERRAR FORMULARIO' : 'AGREGAR MATERIAS'}
-                </Text>
-            </TouchableOpacity>
-
+            {/** Mostrar formulario si showForm es true */}
             {showForm ? (
-                <RegisterSubjectForm onAddSubject={agregarMateria} />
+                <RegisterSubjectForm
+                    onAddSubject={agregarMateria}
+                    onGoBack={() => setShowForm(false)} // Cierra el formulario y regresa a la lista
+                />
             ) : (
                 <>
-                    <Text style={styles.title}>Materias Registradas</Text>
+                    {/** Mostrar Promedio General y Promedios por Semestre */}
+                    <View style={styles.promedioGeneralContainer}>
+                        <Text style={styles.promedioGeneralTitle}>Promedio General</Text>
+                        <Text style={styles.promedioGeneralValue}>{promedioGeneral.toFixed(2)}</Text>
+                    </View>
 
+                    <View style={styles.promediosSemestreContainer}>
+                        <Text style={styles.promediosSemestreTitle}>Promedios por Semestre</Text>
+                        {Object.entries(promediosPorSemestre).map(([semestre, promedio]) => (
+                            <View key={semestre} style={styles.semestreRow}>
+                                <Text style={styles.semestreText}>{semestre}:</Text>
+                                <Text style={styles.semestrePromedio}>{promedio.toFixed(2)}</Text>
+                            </View>
+                        ))}
+                    </View>
+
+                    {/** Botón para alternar formulario */}
+                    <TouchableOpacity
+                        style={styles.addButton}
+                        onPress={() => setShowForm(!showForm)}
+                    >
+                        <Text style={styles.addButtonText}>
+                            {showForm ? 'CERRAR FORMULARIO' : 'AGREGAR MATERIAS'}
+                        </Text>
+                    </TouchableOpacity>
+
+                    {/** Lista de materias */}
+                    <Text style={styles.title}>Materias Registradas</Text>
                     <FlatList
                         data={materias}
                         keyExtractor={(item) => item.id}
                         renderItem={({ item }) => (
                             <View style={styles.item}>
                                 <Text style={styles.itemTitle}>{item.nombre}</Text>
-
                                 <TouchableOpacity
-                                    onPress={() =>
-                                        navigation.navigate('ViewGradesScreen', { materia: item })
-                                    }
+                                    onPress={() => navigation.navigate('ViewGradesScreen', { materia: item })}
                                 >
                                     <View>
                                         <Text style={styles.itemText}>Código: {item.codigo}</Text>
@@ -243,7 +277,7 @@ const MainScreen = ({ navigation }) => {
                                     </View>
                                 </TouchableOpacity>
 
-                                {/* Botones */}
+                                {/** Botones para editar y eliminar */}
                                 <View style={styles.buttons}>
                                     <TouchableOpacity
                                         style={styles.editButton}
@@ -266,6 +300,8 @@ const MainScreen = ({ navigation }) => {
                     />
                 </>
             )}
+
+            {/** Formulario de edición de materia */}
             <EditSubjectForm
                 visible={showEditModal}
                 onClose={() => setShowEditModal(false)}
@@ -294,6 +330,7 @@ const GradesScreen = () => {
         </Stack.Navigator>
     );
 };
+
 const styles = StyleSheet.create({
     container: {
         flex: 1,

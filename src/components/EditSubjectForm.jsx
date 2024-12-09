@@ -128,27 +128,18 @@ const EditSubjectForm = ({ visible, onClose, materia, onUpdate }) => {
 
                     <Text style={styles.pickerLabel}>Selecciona el Semestre</Text>
                     <Picker
-                        selectedValue={editedData.semestre}
+                        selectedValue={editedData?.semestre || ''} // Asegúrate de manejar un valor por defecto si editedData no tiene semestre
                         onValueChange={(itemValue) =>
-                            setEditedData({ ...editedData, semestre: itemValue })
+                            setEditedData({ ...editedData, semestre: itemValue }) // Actualiza la propiedad semestre
                         }
                         style={styles.picker}
                     >
-                        {[
-                            '1er semestre',
-                            '2do semestre',
-                            '3er semestre',
-                            '4to semestre',
-                            '5to semestre',
-                            '6to semestre',
-                            '7mo semestre',
-                            '8vo semestre',
-                            '9no semestre',
-                            '10mo semestre',
-                            '12vo semestre',
-                            '13vo semestre',
-                        ].map((semestre) => (
-                            <Picker.Item key={semestre} label={semestre} value={semestre} />
+                        {[...Array(13)].map((_, index) => (
+                            <Picker.Item
+                                key={index + 1} // Clave única para cada elemento
+                                label={`${index + 1}º semestre`} // Texto visible para cada opción
+                                value={`${index + 1}º semestre`} // Valor asociado
+                            />
                         ))}
                     </Picker>
 

@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, Button, StyleSheet, Alert, TouchableOpacity } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
-import { query, where, getDocs, collection, addDoc, getFirestore} from 'firebase/firestore';
+import { query, where, getDocs, collection, addDoc, getFirestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import app from '../utils/firebase';
 
-const RegisterSubjectForm = ({ onAddSubject }) => {
+const RegisterSubjectForm = ({ onAddSubject, onGoBack }) => {
     const db = getFirestore(app); // Firestore
     const auth = getAuth(app); // Auth
     const [newMateria, setNewMateria] = useState({
@@ -16,6 +16,7 @@ const RegisterSubjectForm = ({ onAddSubject }) => {
         semestre: '1º semestre',
         userId: '', // Será dinámico
     });
+    const [isAdding, setIsAdding] = useState(false); // Estado para evitar inserciones duplicadas
 
     // Validar si el código es único
     const validarCodigoUnico = async (codigo) => {
@@ -40,72 +41,69 @@ const RegisterSubjectForm = ({ onAddSubject }) => {
         }
     };
 
-    let isAdding = false;
+    const agregarMateria = async () => {
+        if (isAdding) {
+            console.log('Ya se está procesando una inserción. Cancelando.');
+            return;
+        }
 
-const agregarMateria = async () => {
-    if (isAdding) {
-        console.log('Ya se está procesando una inserción. Cancelando.');
-        return;
-    }
+        setIsAdding(true);
 
-    isAdding = true;
+        const userId = auth.currentUser?.uid;
 
-    const userId = auth.currentUser?.uid;
+        if (!userId) {
+            Alert.alert('Error', 'Usuario no autenticado.');
+            setIsAdding(false);
+            return;
+        }
 
-    if (!userId) {
-        Alert.alert('Error', 'Usuario no autenticado.');
-        isAdding = false;
-        return;
-    }
+        if (
+            !newMateria.nombre.trim() ||
+            !newMateria.codigo.trim() ||
+            !newMateria.docente.trim() ||
+            !newMateria.semestre.trim()
+        ) {
+            Alert.alert('Error', 'Todos los campos son obligatorios.');
+            setIsAdding(false);
+            return;
+        }
 
-    if (
-        !newMateria.nombre.trim() ||
-        !newMateria.codigo.trim() ||
-        !newMateria.docente.trim() ||
-        !newMateria.semestre.trim()
-    ) {
-        Alert.alert('Error', 'Todos los campos son obligatorios.');
-        isAdding = false;
-        return;
-    }
+        const codigoEsUnico = await validarCodigoUnico(newMateria.codigo);
+        if (!codigoEsUnico) {
+            Alert.alert('Error', 'El código ya existe. Por favor, usa un código único.');
+            setIsAdding(false);
+            return;
+        }
 
-    const codigoEsUnico = await validarCodigoUnico(newMateria.codigo);
-    if (!codigoEsUnico) {
-        Alert.alert('Error', 'El código ya existe. Por favor, usa un código único.');
-        isAdding = false;
-        return;
-    }
+        try {
+            const datosParaFirestore = {
+                nombre: newMateria.nombre.trim(),
+                calificaciones: [],
+                codigo: newMateria.codigo.trim(),
+                docente: newMateria.docente.trim(),
+                semestre: newMateria.semestre.trim(),
+                userId,
+            };
 
-    try {
-        const datosParaFirestore = {
-            nombre: newMateria.nombre.trim(),
-            calificaciones: [],
-            codigo: newMateria.codigo.trim(),
-            docente: newMateria.docente.trim(),
-            semestre: newMateria.semestre.trim(),
-            userId,
-        };
+            const docRef = await addDoc(collection(db, 'materias'), datosParaFirestore);
+            console.log('Materia agregada con ID:', docRef.id);
 
-        const docRef = await addDoc(collection(db, 'materias'), datosParaFirestore);
-        console.log('Materia agregada con ID:', docRef.id);
+            onAddSubject({ ...datosParaFirestore, id: docRef.id });
 
-        onAddSubject({ ...datosParaFirestore, id: docRef.id });
+            setNewMateria({
+                nombre: '',
+                calificaciones: [],
+                codigo: '',
+                docente: '',
+                semestre: '1º semestre',
+            });
+        } catch (error) {
+            Alert.alert('Error', `No se pudo agregar la materia: ${error.message}`);
+        } finally {
+            setIsAdding(false);
+        }
+    };
 
-        setNewMateria({
-            nombre: '',
-            calificaciones: [],
-            codigo: '',
-            docente: '',
-            semestre: '1º semestre',
-        });
-    } catch (error) {
-        Alert.alert('Error', `No se pudo agregar la materia: ${error.message}`);
-    } finally {
-        isAdding = false;
-    }
-};
-      
-    
     const handleCodigoChange = (text) => {
         const numericValue = text.replace(/[^0-9]/g, '');
         setNewMateria({ ...newMateria, codigo: numericValue });
@@ -143,7 +141,7 @@ const agregarMateria = async () => {
                 onValueChange={(itemValue) => setNewMateria({ ...newMateria, semestre: itemValue })}
                 style={styles.picker}
             >
-                {[...Array(10)].map((_, index) => (
+                {[...Array(13)].map((_, index) => (
                     <Picker.Item
                         key={index}
                         label={`${index + 1}º semestre`}
@@ -152,7 +150,13 @@ const agregarMateria = async () => {
                 ))}
             </Picker>
 
-            <Button title="Agregar Materia" onPress={agregarMateria} />
+            <TouchableOpacity style={styles.addButton} onPress={agregarMateria}>
+                <Text style={styles.addButtonText}>Agregar Materia</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.backButton} onPress={onGoBack}>
+                <Text style={styles.backButtonText}>Volver</Text>
+            </TouchableOpacity>
         </View>
     );
 };
@@ -199,6 +203,35 @@ const styles = StyleSheet.create({
         marginVertical: 10,
         textAlign: 'center',
     },
+    backButton: {
+        marginTop: 170,
+        width: '50%',
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        backgroundColor: '#e74c3c',
+        borderRadius: 10,
+    },
+    backButtonText: {
+        color: '#fff',
+        fontWeight: 'bold',
+        fontSize: 16,
+        textAlign: 'center',
+    },
+    addButton: {
+        marginTop: 10,
+        width: '50%',
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        backgroundColor: '#3498db',
+        borderRadius: 10,
+    },
+    addButtonText: {
+        color: '#fff',
+        fontWeight: 'bold',
+        fontSize: 16,
+        textAlign: 'center',
+    },
 });
+//3498db
 
 export default RegisterSubjectForm;

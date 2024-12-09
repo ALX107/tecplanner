@@ -10,6 +10,7 @@ const ViewGradesScreen = ({ route, navigation }) => {
     const [promedioMateria, setPromedioMateria] = useState(0);
     const db = getFirestore(app);
 
+    // Verificar calificaciones existentes al cargar el componente
     useEffect(() => {
         verificarCalificacionesExistentes();
     }, []);
@@ -22,7 +23,7 @@ const ViewGradesScreen = ({ route, navigation }) => {
             if (docSnap.exists()) {
                 const calificacionesExistentes = docSnap.data().calificaciones || [];
                 setCalificaciones(calificacionesExistentes);
-                setPromedioMateria(calcularPromedioMateria(calificacionesExistentes));
+                recalcularPromedio(calificacionesExistentes);
                 setViewMode(calificacionesExistentes.length > 0 ? 'view' : 'register');
             }
         } catch (error) {
@@ -35,6 +36,9 @@ const ViewGradesScreen = ({ route, navigation }) => {
             const materiaRef = doc(db, 'materias', materia.id);
             await updateDoc(materiaRef, { calificaciones });
             Alert.alert('Éxito', 'Calificaciones registradas correctamente.');
+
+            // Recargar calificaciones desde Firestore
+            verificarCalificacionesExistentes();
             setViewMode('view');
         } catch (error) {
             Alert.alert('Error', 'No se pudieron registrar las calificaciones.');
@@ -47,7 +51,11 @@ const ViewGradesScreen = ({ route, navigation }) => {
             Alert.alert('Error', 'No puedes agregar más de 6 unidades.');
             return;
         }
-        setCalificaciones((prevCalificaciones) => [...prevCalificaciones, ""]);
+        setCalificaciones((prevCalificaciones) => {
+            const nuevasCalificaciones = [...prevCalificaciones, ""];
+            recalcularPromedio(nuevasCalificaciones); // Recalcular promedio al agregar
+            return nuevasCalificaciones;
+        });
     };
 
     const verificarEstado = () => {
@@ -65,6 +73,7 @@ const ViewGradesScreen = ({ route, navigation }) => {
         const nuevaCalificaciones = [...calificaciones];
         nuevaCalificaciones[index] = value;
         setCalificaciones(nuevaCalificaciones);
+        recalcularPromedio(nuevaCalificaciones); // Recalcular promedio al modificar calificaciones
     };
 
     const confirmarCalificacion = (index) => {
@@ -85,12 +94,46 @@ const ViewGradesScreen = ({ route, navigation }) => {
 
         nuevaCalificaciones[index] = calificacionNumerica;
         setCalificaciones(nuevaCalificaciones);
+        recalcularPromedio(nuevaCalificaciones); // Recalcular promedio al confirmar cambios
     };
 
-    const calcularPromedioMateria = (calificaciones) => {
-        if (!calificaciones || calificaciones.length === 0) return 0;
-        const suma = calificaciones.reduce((a, b) => a + b, 0);
-        return suma / calificaciones.length;
+    const recalcularPromedio = async (nuevasCalificaciones) => {
+        if (!nuevasCalificaciones || nuevasCalificaciones.length === 0) {
+            setPromedioMateria(0);
+            return;
+        }
+
+        // Verificar si hay algún 0 en las calificaciones
+        if (nuevasCalificaciones.includes(0)) {
+            setPromedioMateria(0);
+
+            try {
+                // Guardar el promedio como 0 en Firebase
+                const materiaRef = doc(db, 'materias', materia.id);
+                await updateDoc(materiaRef, { promedio: 0 });
+
+                console.log(`Promedio actualizado en Firebase: 0`);
+            } catch (error) {
+                console.error('Error al guardar el promedio en Firebase:', error);
+            }
+
+            return;
+        }
+
+        // Si no hay 0, calcular el promedio normalmente
+        const suma = nuevasCalificaciones.reduce((a, b) => a + b, 0);
+        const promedioCalculado = suma / nuevasCalificaciones.length;
+        setPromedioMateria(promedioCalculado);
+
+        try {
+            // Guardar el promedio en Firebase
+            const materiaRef = doc(db, 'materias', materia.id);
+            await updateDoc(materiaRef, { promedio: promedioCalculado });
+
+            console.log(`Promedio actualizado en Firebase: ${promedioCalculado}`);
+        } catch (error) {
+            console.error('Error al guardar el promedio en Firebase:', error);
+        }
     };
 
     return (
