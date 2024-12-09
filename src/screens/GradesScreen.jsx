@@ -4,7 +4,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import RegisterSubjectForm from '../components/RegisterSubjectForm';
 import EditSubjectForm from '../components/EditSubjectForm';
 import ViewGradesScreen from './ViewGradesScreen';
-import { updateDoc, increment, getFirestore, collection, getDocs, doc, query, where, deleteDoc, addDoc, getDoc } from 'firebase/firestore';
+import { updateDoc, setDoc, getFirestore, collection, getDocs, doc, query, where, deleteDoc, addDoc, getDoc } from 'firebase/firestore';
 import app from '../utils/firebase';
 import { getAuth } from 'firebase/auth';
 
@@ -16,6 +16,8 @@ const MainScreen = ({ navigation }) => {
     const [showEditModal, setShowEditModal] = useState(false);
     const [selectedMateria, setSelectedMateria] = useState(null);
     const db = getFirestore(app);
+    const [promediosPorSemestre, setPromediosPorSemestre] = useState({});
+    const [promedioGeneral, setPromedioGeneral] = useState(0);
 
     // Cargar materias desde Firestore
     useEffect(() => {
@@ -23,36 +25,37 @@ const MainScreen = ({ navigation }) => {
             try {
                 const auth = getAuth(app);
                 const userId = auth.currentUser?.uid;
-    
+
                 if (!userId) {
                     console.error("Usuario no autenticado.");
                     return;
                 }
-    
+
                 const db = getFirestore(app);
-    
+
                 // Filtrar materias por userId
                 const q = query(
                     collection(db, "materias"),
                     where("userId", "==", userId)
                 );
-    
+
                 const querySnapshot = await getDocs(q);
                 const materiasData = querySnapshot.docs.map((doc) => ({
                     id: doc.id,
                     ...doc.data(),
                 }));
-    
+
                 setMaterias(materiasData);
+                calcularPromedios(materiasData);
             } catch (error) {
                 console.error("Error al obtener las materias:", error);
             }
         };
-    
+
         fetchMaterias();
     }, []);
-    
-    
+
+
 
     // Agregar una nueva materia
     const agregarMateria = (materia) => {
@@ -60,30 +63,30 @@ const MainScreen = ({ navigation }) => {
         setShowForm(false);
     };
 
-const eliminarMateria = async (id) => {
-    try {
-        console.log('Intentando eliminar documento con ID:', id); // Depuración
-        const docRef = doc(db, 'materias', id);
+    const eliminarMateria = async (id) => {
+        try {
+            console.log('Intentando eliminar documento con ID:', id); // Depuración
+            const docRef = doc(db, 'materias', id);
 
-        // Verificar si el documento existe antes de eliminarlo
-        const docSnap = await getDoc(docRef);
-        if (!docSnap.exists()) {
-            console.error('El documento con el ID proporcionado no existe:', id);
-            return;
+            // Verificar si el documento existe antes de eliminarlo
+            const docSnap = await getDoc(docRef);
+            if (!docSnap.exists()) {
+                console.error('El documento con el ID proporcionado no existe:', id);
+                return;
+            }
+
+            // Eliminar el documento
+            await deleteDoc(docRef);
+            console.log(`Documento con ID ${id} eliminado correctamente`);
+
+            // Actualizar el estado local
+            setMaterias((prevMaterias) =>
+                prevMaterias.filter((materia) => materia.id !== id)
+            );
+        } catch (error) {
+            console.error('Error al eliminar la materia: ', error.message);
         }
-
-        // Eliminar el documento
-        await deleteDoc(docRef);
-        console.log(`Documento con ID ${id} eliminado correctamente`);
-
-        // Actualizar el estado local
-        setMaterias((prevMaterias) =>
-            prevMaterias.filter((materia) => materia.id !== id)
-        );
-    } catch (error) {
-        console.error('Error al eliminar la materia: ', error.message);
-    }
-};
+    };
 
     // Actualizar la lista local después de editar
     const actualizarMateria = async (updatedMateria) => {
@@ -93,7 +96,7 @@ const eliminarMateria = async (id) => {
                 console.error('Usuario no autenticado.');
                 return;
             }
-    
+
             // Actualizar la materia en Firestore
             const db = getFirestore(app);
             const docRef = doc(db, 'materias', updatedMateria.id);
@@ -104,75 +107,108 @@ const eliminarMateria = async (id) => {
                 docente: updatedMateria.docente,
                 semestre: updatedMateria.semestre,
             });
-    
-            // Actualizar el promedio general
-            await actualizarPromedioGeneral(userId);
-    
-            // Actualizar el estado local
-            setMaterias((prevMaterias) =>
-                prevMaterias.map((materia) =>
-                    materia.id === updatedMateria.id ? updatedMateria : materia
-                )
+
+            // Actualizar el estado local y recalcular promedios
+            const materiasActualizadas = materias.map((materia) =>
+                materia.id === updatedMateria.id ? updatedMateria : materia
             );
+            setMaterias(materiasActualizadas);
+            calcularPromedios(materiasActualizadas);
         } catch (error) {
             console.error('Error al actualizar la materia:', error);
         }
     };
-    
 
-    const guardarCalificaciones = async (materiaId, calificaciones) => {
-        try {
-            const db = getFirestore(app);
-            const userId = getAuth(app).currentUser.uid;
-    
-            // Actualizar las calificaciones de la materia
-            await updateDoc(doc(db, 'materias', materiaId), { calificaciones });
-    
-            // Actualizar el promedio general del usuario
-            await actualizarPromedioGeneral(userId);
-        } catch (error) {
-            console.error('Error al guardar calificaciones:', error);
-        }
-    };
-    
-    const actualizarPromedioGeneral = async (userId) => {
-        try {
-            const db = getFirestore(app);
-    
-            // Obtener todas las materias del usuario
-            const materiasSnapshot = await getDocs(
-                query(collection(db, 'materias'), where('userId', '==', userId))
-            );
-    
-            let totalSum = 0;
-            let totalSubjects = 0;
-    
-            materiasSnapshot.forEach((doc) => {
-                const data = doc.data();
-                if (data.calificaciones && data.calificaciones.length > 0) {
-                    const promedioMateria =
-                        data.calificaciones.reduce((a, b) => a + b, 0) / data.calificaciones.length;
-                    totalSum += promedioMateria;
-                    totalSubjects += 1;
+    // Función para calcular promedios
+    const calcularPromedios = async (materiasData) => {
+        const promediosSemestre = {};
+        let sumaTotal = 0;
+        let materiasConCalificaciones = 0;
+
+        materiasData.forEach((materia) => {
+            if (materia.calificaciones && materia.calificaciones.length > 0) {
+                // Calcular promedio de la materia
+                const promedioMateria = materia.calificaciones.reduce((a, b) => a + b, 0) /
+                    materia.calificaciones.length;
+
+                // Agrupar por semestre
+                if (!promediosSemestre[materia.semestre]) {
+                    promediosSemestre[materia.semestre] = {
+                        suma: 0,
+                        cantidad: 0
+                    };
                 }
-            });
-    
-            // Calcular el promedio general
-            const promedioGeneral = totalSubjects > 0 ? totalSum / totalSubjects : 0;
-    
-            // Actualizar en Firestore
-            await updateDoc(doc(db, 'users', userId), {
-                promedioGeneral,
-            });
-            console.log('Promedio General actualizado:', promedioGeneral);
+
+                promediosSemestre[materia.semestre].suma += promedioMateria;
+                promediosSemestre[materia.semestre].cantidad += 1;
+
+                sumaTotal += promedioMateria;
+                materiasConCalificaciones += 1;
+            }
+        });
+
+        // Calcular promedio final por semestre
+        const promediosFinales = {};
+        Object.keys(promediosSemestre).forEach(semestre => {
+            promediosFinales[semestre] = promediosSemestre[semestre].suma /
+                promediosSemestre[semestre].cantidad;
+        });
+
+        // Calcular promedio general
+        const promedioGeneralCalculado = materiasConCalificaciones > 0 ?
+            sumaTotal / materiasConCalificaciones : 0;
+
+        setPromediosPorSemestre(promediosFinales);
+        setPromedioGeneral(promedioGeneralCalculado);
+
+        // Guardar promedio general en Firestore
+        try {
+            const auth = getAuth(app);
+            const userId = auth.currentUser?.uid;
+
+            if (!userId) {
+                console.error('Usuario no autenticado.');
+                return;
+            }
+
+            // Actualizar el campo averageGrade en la colección users
+            const userDocRef = doc(db, 'users', userId);
+            await setDoc(userDocRef, { averageGrade: promedioGeneralCalculado }, { merge: true });
+            console.log('Promedio general guardado correctamente en Firestore.');
         } catch (error) {
-            console.error('Error al actualizar el promedio general:', error);
+            console.error('Error al guardar el promedio general en Firestore:', error);
         }
     };
-    
 
     return (
         <View style={styles.container}>
+            {/* Mostrar Promedio General */}
+            <View style={styles.promedioGeneralContainer}>
+                <Text style={styles.promedioGeneralTitle}>
+                    Promedio General
+                </Text>
+                <Text style={styles.promedioGeneralValue}>
+                    {promedioGeneral.toFixed(2)}
+                </Text>
+            </View>
+
+            {/* Mostrar Promedios por Semestre */}
+            <View style={styles.promediosSemestreContainer}>
+                <Text style={styles.promediosSemestreTitle}>
+                    Promedios por Semestre
+                </Text>
+                {Object.entries(promediosPorSemestre).map(([semestre, promedio]) => (
+                    <View key={semestre} style={styles.semestreRow}>
+                        <Text style={styles.semestreText}>
+                            {semestre}:
+                        </Text>
+                        <Text style={styles.semestrePromedio}>
+                            {promedio.toFixed(2)}
+                        </Text>
+                    </View>
+                ))}
+            </View>
+
             <TouchableOpacity
                 style={styles.addButton}
                 onPress={() => setShowForm(!showForm)}
@@ -360,6 +396,52 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.1,
         shadowRadius: 5,
         elevation: 4,
+    },
+    promedioGeneralContainer: {
+        backgroundColor: '#fff',
+        padding: 15,
+        borderRadius: 10,
+        marginBottom: 20,
+        elevation: 3,
+    },
+    promedioGeneralTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: '#34495e',
+        textAlign: 'center',
+    },
+    promedioGeneralValue: {
+        fontSize: 24,
+        color: '#2ecc71',
+        textAlign: 'center',
+        fontWeight: 'bold',
+    },
+    promediosSemestreContainer: {
+        backgroundColor: '#fff',
+        padding: 15,
+        borderRadius: 10,
+        marginBottom: 20,
+        elevation: 3,
+    },
+    promediosSemestreTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#34495e',
+        marginBottom: 10,
+    },
+    semestreRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingVertical: 5,
+    },
+    semestreText: {
+        fontSize: 16,
+        color: '#34495e',
+    },
+    semestrePromedio: {
+        fontSize: 16,
+        color: '#3498db',
+        fontWeight: 'bold',
     },
 });
 

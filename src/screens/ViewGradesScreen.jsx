@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {View, Text, TextInput, StyleSheet, Alert, TouchableOpacity, Platform, KeyboardAvoidingView, ScrollView,} from 'react-native';
+import { View, Text, TextInput, StyleSheet, Alert, TouchableOpacity, Platform, KeyboardAvoidingView, ScrollView, } from 'react-native';
 import { getFirestore, doc, updateDoc, getDoc } from 'firebase/firestore';
 import app from '../utils/firebase';
 
@@ -7,6 +7,7 @@ const ViewGradesScreen = ({ route, navigation }) => {
     const { materia } = route.params;
     const [calificaciones, setCalificaciones] = useState([]);
     const [viewMode, setViewMode] = useState('');
+    const [promedioMateria, setPromedioMateria] = useState(0);
     const db = getFirestore(app);
 
     useEffect(() => {
@@ -21,6 +22,7 @@ const ViewGradesScreen = ({ route, navigation }) => {
             if (docSnap.exists()) {
                 const calificacionesExistentes = docSnap.data().calificaciones || [];
                 setCalificaciones(calificacionesExistentes);
+                setPromedioMateria(calcularPromedioMateria(calificacionesExistentes));
                 setViewMode(calificacionesExistentes.length > 0 ? 'view' : 'register');
             }
         } catch (error) {
@@ -83,6 +85,12 @@ const ViewGradesScreen = ({ route, navigation }) => {
 
         nuevaCalificaciones[index] = calificacionNumerica;
         setCalificaciones(nuevaCalificaciones);
+    };
+
+    const calcularPromedioMateria = (calificaciones) => {
+        if (!calificaciones || calificaciones.length === 0) return 0;
+        const suma = calificaciones.reduce((a, b) => a + b, 0);
+        return suma / calificaciones.length;
     };
 
     return (
@@ -162,6 +170,16 @@ const ViewGradesScreen = ({ route, navigation }) => {
                                 </Text>
                             </View>
                         ))}
+
+                        <View style={styles.promedioContainer}>
+                            <Text style={styles.promedioTitle}>Promedio de la Materia</Text>
+                            <Text style={[
+                                styles.promedioValue,
+                                { color: promedioMateria >= 8 ? '#2ecc71' : promedioMateria >= 6 ? '#f1c40f' : '#e74c3c' }
+                            ]}>
+                                {promedioMateria.toFixed(2)}
+                            </Text>
+                        </View>
                     </>
                 )}
 
@@ -264,6 +282,23 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
         borderRadius: 10,
         alignItems: 'center',
+    },
+    promedioContainer: {
+        backgroundColor: '#fff',
+        borderRadius: 10,
+        padding: 15,
+        marginTop: 20,
+        alignItems: 'center',
+        elevation: 3,
+    },
+    promedioTitle: {
+        fontSize: 18,
+        color: '#34495e',
+        marginBottom: 5,
+    },
+    promedioValue: {
+        fontSize: 32,
+        fontWeight: 'bold',
     },
 });
 

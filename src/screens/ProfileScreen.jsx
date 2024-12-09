@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext } from "react";
-import { View, Text, TextInput, Button, StyleSheet, Alert, Switch } from "react-native";
+import { View, Text, TextInput, Button, StyleSheet, Alert, Switch, TouchableOpacity } from "react-native";
 import { getAuth, updatePassword, deleteUser } from "firebase/auth";
-import { getFirestore, doc, getDoc, updateDoc, deleteDoc } from "firebase/firestore";
+import { getFirestore, doc, getDoc, updateDoc, deleteDoc, query, collection, where, getDocs } from "firebase/firestore";
 import { ThemeContext } from '../context/ThemeContext';
 
 const ProfileScreen = ({ navigation }) => {
@@ -13,17 +13,14 @@ const ProfileScreen = ({ navigation }) => {
   const auth = getAuth();
   const db = getFirestore();
 
+
   // Cargar datos del usuario desde Firestore
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        const userDoc = doc(db, 'users', auth.currentUser.uid); // Documento del usuario
-        const userSnap = await getDoc(userDoc);
-
-        if (userSnap.exists()) {
-          setUserData(userSnap.data()); // Almacenar datos del usuario
-        } else {
-          console.log("No se encontraron datos para este usuario");
+        const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
+        if (userDoc.exists()) {
+          setUserData(userDoc.data());
         }
       } catch (error) {
         console.error("Error al cargar los datos del usuario:", error);
@@ -111,7 +108,7 @@ const ProfileScreen = ({ navigation }) => {
   }
 
   return (
-    <View style={isDarkMode ? styles.darkContainer : styles.lightContainer}>
+    <View style={[styles.container, isDarkMode && styles.darkContainer]}>
       <Text style={styles.title}>Perfil del Usuario</Text>
       <Text style={styles.info}>Nombre: {userData.name}</Text>
       <Text style={styles.info}>Correo: {userData.email}</Text>
@@ -147,6 +144,7 @@ const ProfileScreen = ({ navigation }) => {
         color="red"
         onPress={confirmDeleteAccount}
       />
+
     </View>
   );
 };
@@ -191,6 +189,19 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#333333',
     padding: 20,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  darkContainer: {
+    backgroundColor: '#2c3e50',
+  },
+  darkText: {
+    color: '#ecf0f1',
   },
 });
 

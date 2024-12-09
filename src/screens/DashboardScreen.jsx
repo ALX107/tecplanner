@@ -12,7 +12,7 @@ const DashboardScreen = ({ navigation }) => {
 
     // Función para cerrar sesión
     const logout = () => {
-        const auth = getAuth();
+        const auth = getAuth(app);
         signOut(auth)
             .then(() => {
                 Alert.alert(
@@ -71,10 +71,11 @@ const DashboardScreen = ({ navigation }) => {
         }
     };
 
+
     // Efecto para cargar datos cuando la pantalla está activa
     useEffect(() => {
         if (isFocused) {
-            fetchUserName(); // Vuelve a cargar los datos cuando la pantalla está activa
+            fetchUserName();
         }
     }, [isFocused]);
 
@@ -86,6 +87,8 @@ const DashboardScreen = ({ navigation }) => {
             />
 
             <Text style={styles.title}>Bienvenido, {userName}</Text>
+
+
 
             <TouchableOpacity
                 style={styles.button}
@@ -177,7 +180,24 @@ const styles = StyleSheet.create({
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.25,
         shadowRadius: 4,
-    }
+    },
+    statsCard: {
+        backgroundColor: '#fff',
+        borderRadius: 10,
+        padding: 15,
+        marginVertical: 10,
+        elevation: 3,
+        alignItems: 'center',
+    },
+    statsTitle: {
+        fontSize: 18,
+        color: '#34495e',
+        marginBottom: 5,
+    },
+    statsValue: {
+        fontSize: 32,
+        fontWeight: 'bold',
+    },
 });
 
 export default DashboardScreen;
